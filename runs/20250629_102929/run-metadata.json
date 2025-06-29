@@ -1,0 +1,11 @@
+{
+  "runId": "20250629_102929",
+  "startTime": "2025-06-29T08:29:29.014Z",
+  "inputFile": "./test_3_companies.csv",
+  "totalCompanies": 3,
+  "currentPhase": "SCREENSHOTS",
+  "companiesProcessed": 3,
+  "companiesWithWebsites": 3,
+  "companiesWithScreenshots": 0,
+  "companiesAnalyzed": 0
+}
