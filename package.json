@@ -9,6 +9,8 @@
     "test": "ts-node test-infrastructure.ts",
     "test:phase2": "ts-node test-phase2.ts",
     "test:ai": "ts-node test-ai-validation.ts",
+    "test:ai-analysis": "ts-node test-ai-analysis.ts",
+    "analyze": "npx ts-node -e \"require('./src/websiteAnalysisRunner').runWebsiteAnalysis(process.argv[4], process.argv[5] === 'force')\"",
     "screenshot": "npx ts-node -e \"require('./src/screenshotCapture').runScreenshotCapture(process.argv[2] || '20250629_110643', parseInt(process.argv[3]) || 1)\"",
     "dev": "ts-node --watch test-phase2.ts",
     "build": "tsc",
@@ -32,7 +34,8 @@
     "googleapis": "^150.0.1",
     "ink": "^6.0.1",
     "playwright": "^1.53.1",
-    "react": "^19.1.0"
+    "react": "^19.1.0",
+    "sharp": "^0.34.2"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
