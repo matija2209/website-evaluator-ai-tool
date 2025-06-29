@@ -64,7 +64,7 @@ aiValidatedResult?: SearchResult;
 ```typescript
 gemini: {
   apiKey: process.env.GOOGLE_CLOUD_API_KEY || '',
-  model: 'gemini-2.0-flash-exp',
+  model: 'gemini-2.5-flash-lite-preview-06-17',
   rateLimitDelay: 500, // 2 requests per second
   maxRetries: 2,
   temperature: 0.1, // Low temperature for consistent results

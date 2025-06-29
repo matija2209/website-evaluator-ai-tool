@@ -21,6 +21,8 @@ export interface ScoreBreakdown {
   userExperience: number;  // 0-10
 }
 
+export type DesignEra = 'EARLY_2000S' | 'MID_2000S' | 'LATE_2000S' | 'EARLY_2010S' | 'MID_2010S' | 'LATE_2010S' | 'EARLY_2020S' | 'MODERN_2020S';
+
 export interface WebsiteAnalysisResult {
   // Individual scores
   mobileScore: ScoreBreakdown;
@@ -36,6 +38,12 @@ export interface WebsiteAnalysisResult {
   desktopIssues: string[];
   quickWins: string[];           // Easy improvements
   majorUpgrades: string[];       // Significant changes needed
+  
+  // Design age analysis
+  designAge: {
+    era: DesignEra;
+    reasoning: string;
+  };
   
   // Metadata
   confidence: number;            // 0-100
@@ -63,9 +71,9 @@ export const analysisConfig = {
     desktopWeight: 0.3
   },
   gemini: {
-    model: 'gemini-2.0-flash-exp',
+    model: 'gemini-2.5-flash-lite-preview-06-17',
     temperature: 0.1,
-    maxTokensPerAnalysis: 1000,
+    maxTokensPerAnalysis: 1500,
     rateLimitDelay: 500
   },
   processing: {
@@ -143,6 +151,144 @@ export function assessOpportunityLevel(score: number): OpportunityLevel {
   return 'NONE';
 }
 
+export function determineDesignEra(
+  mobileAnalysis: any, 
+  desktopAnalysis: any
+): { era: DesignEra; reasoning: string } {
+  const reasoningParts: string[] = [];
+  let eraScore = 0; // Score to determine era (0-7 mapping to our 8 eras)
+  
+  // Extract design indicators with mobile priority (70%) and desktop (30%)
+  const mobileWeight = 0.7;
+  const desktopWeight = 0.3;
+  
+  // Analyze mobile indicators
+  if (mobileAnalysis?.designIndicators) {
+    const mobile = mobileAnalysis.designIndicators;
+    
+    // Layout approach scoring
+    if (mobile.layoutApproach?.toLowerCase().includes('table')) {
+      eraScore += 0 * mobileWeight;
+      reasoningParts.push('table-based mobile layout suggests early 2000s approach');
+    } else if (mobile.layoutApproach?.toLowerCase().includes('float')) {
+      eraScore += 1 * mobileWeight;
+      reasoningParts.push('float-based mobile layout indicates mid-2000s techniques');
+    } else if (mobile.layoutApproach?.toLowerCase().includes('responsive') && !mobile.layoutApproach?.toLowerCase().includes('mobile-first')) {
+      eraScore += 3 * mobileWeight;
+      reasoningParts.push('responsive design without mobile-first suggests early 2010s');
+    } else if (mobile.layoutApproach?.toLowerCase().includes('mobile-first')) {
+      eraScore += 5 * mobileWeight;
+      reasoningParts.push('mobile-first approach indicates mid-2010s or later');
+    } else if (mobile.layoutApproach?.toLowerCase().includes('grid') || mobile.layoutApproach?.toLowerCase().includes('flexbox')) {
+      eraScore += 6 * mobileWeight;
+      reasoningParts.push('modern CSS Grid/Flexbox layout suggests 2020s design');
+    }
+    
+    // Typography scoring
+    if (mobile.typography?.toLowerCase().includes('web-safe')) {
+      eraScore += 1 * mobileWeight;
+      reasoningParts.push('web-safe fonts suggest early web design era');
+    } else if (mobile.typography?.toLowerCase().includes('custom') || mobile.typography?.toLowerCase().includes('web font')) {
+      eraScore += 4 * mobileWeight;
+      reasoningParts.push('custom web fonts indicate 2010s design evolution');
+    } else if (mobile.typography?.toLowerCase().includes('variable') || mobile.typography?.toLowerCase().includes('modern')) {
+      eraScore += 7 * mobileWeight;
+      reasoningParts.push('modern typography suggests contemporary design');
+    }
+    
+    // Button style scoring
+    if (mobile.buttonStyle?.toLowerCase().includes('basic') || mobile.buttonStyle?.toLowerCase().includes('simple')) {
+      eraScore += 1 * mobileWeight;
+      reasoningParts.push('basic button design suggests early web era');
+    } else if (mobile.buttonStyle?.toLowerCase().includes('rounded') || mobile.buttonStyle?.toLowerCase().includes('gradient')) {
+      eraScore += 3 * mobileWeight;
+      reasoningParts.push('rounded/gradient buttons indicate 2010s design trends');
+    } else if (mobile.buttonStyle?.toLowerCase().includes('flat')) {
+      eraScore += 5 * mobileWeight;
+      reasoningParts.push('flat button design suggests mid-2010s minimalist approach');
+    } else if (mobile.buttonStyle?.toLowerCase().includes('interactive') || mobile.buttonStyle?.toLowerCase().includes('modern')) {
+      eraScore += 7 * mobileWeight;
+      reasoningParts.push('modern interactive buttons indicate contemporary design');
+    }
+  }
+  
+  // Analyze desktop indicators (similar logic with desktop weight)
+  if (desktopAnalysis?.designIndicators) {
+    const desktop = desktopAnalysis.designIndicators;
+    
+    // Layout approach scoring
+    if (desktop.layoutApproach?.toLowerCase().includes('table')) {
+      eraScore += 0 * desktopWeight;
+      reasoningParts.push('table-based desktop layout confirms early 2000s era');
+    } else if (desktop.layoutApproach?.toLowerCase().includes('float')) {
+      eraScore += 1 * desktopWeight;
+      reasoningParts.push('float-based desktop layout indicates CSS evolution period');
+    } else if (desktop.layoutApproach?.toLowerCase().includes('framework') || desktop.layoutApproach?.toLowerCase().includes('bootstrap')) {
+      eraScore += 4 * desktopWeight;
+      reasoningParts.push('CSS framework usage suggests 2010s development');
+    } else if (desktop.layoutApproach?.toLowerCase().includes('grid') || desktop.layoutApproach?.toLowerCase().includes('flexbox')) {
+      eraScore += 6 * desktopWeight;
+      reasoningParts.push('modern CSS Grid/Flexbox on desktop confirms 2020s approach');
+    }
+    
+    // Overall aesthetic scoring
+    if (desktop.overallAesthetic?.toLowerCase().includes('skeuomorphic')) {
+      eraScore += 2 * desktopWeight;
+      reasoningParts.push('skeuomorphic design elements suggest late 2000s era');
+    } else if (desktop.overallAesthetic?.toLowerCase().includes('flat')) {
+      eraScore += 5 * desktopWeight;
+      reasoningParts.push('flat design aesthetic indicates 2010s design philosophy');
+    } else if (desktop.overallAesthetic?.toLowerCase().includes('material')) {
+      eraScore += 6 * desktopWeight;
+      reasoningParts.push('material design elements suggest mid-2010s Google influence');
+    } else if (desktop.overallAesthetic?.toLowerCase().includes('minimalist') || desktop.overallAesthetic?.toLowerCase().includes('modern')) {
+      eraScore += 7 * desktopWeight;
+      reasoningParts.push('modern minimalist aesthetic indicates contemporary design');
+    }
+  }
+  
+  // Fallback to analysis scores if no design indicators
+  if (reasoningParts.length === 0) {
+    const mobileScore = mobileAnalysis?.overall || 0;
+    const desktopScore = desktopAnalysis?.overall || 0;
+    const combinedScore = mobileScore * 0.7 + desktopScore * 0.3;
+    
+    if (combinedScore < 30) {
+      eraScore = 1; // Likely outdated
+      reasoningParts.push('very low design scores suggest outdated design era');
+    } else if (combinedScore < 50) {
+      eraScore = 3; // Early 2010s
+      reasoningParts.push('moderate design scores suggest early 2010s era');
+    } else if (combinedScore < 70) {
+      eraScore = 5; // Mid 2010s
+      reasoningParts.push('good design scores suggest mid-2010s era');
+    } else {
+      eraScore = 6; // Modern
+      reasoningParts.push('high design scores suggest modern design era');
+    }
+  }
+  
+  // Map score to era
+  const eras: DesignEra[] = [
+    'EARLY_2000S',    // 0
+    'MID_2000S',      // 1
+    'LATE_2000S',     // 2
+    'EARLY_2010S',    // 3
+    'MID_2010S',      // 4
+    'LATE_2010S',     // 5
+    'EARLY_2020S',    // 6
+    'MODERN_2020S'    // 7
+  ];
+  
+  const eraIndex = Math.min(7, Math.max(0, Math.round(eraScore)));
+  const era = eras[eraIndex];
+  
+  return {
+    era,
+    reasoning: reasoningParts.join('. ') || 'Design era estimated based on overall analysis quality'
+  };
+}
+
 // Delay utility for rate limiting
 async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -209,6 +355,14 @@ Analyze this mobile screenshot and provide scores (0-100 scale) for:
 - Clear mobile call-to-actions
 - Mobile conversion path clarity
 
+5. DESIGN ERA INDICATORS:
+- Layout approach (table-based, float-based, flexbox, grid, mobile-first vs responsive)
+- Typography style (web-safe fonts vs custom fonts vs modern typography)
+- Color scheme sophistication (basic colors vs gradients vs modern palettes)
+- Button design (basic buttons vs rounded vs flat vs modern interactive)
+- Overall aesthetic (skeuomorphic vs flat vs material vs modern minimalist)
+- Mobile responsiveness approach (separate mobile site vs responsive vs mobile-first)
+
 Respond with valid JSON only:
 {
   "visualDesign": <score 0-40>,
@@ -219,7 +373,15 @@ Respond with valid JSON only:
   "issues": ["issue1", "issue2", ...],
   "recommendations": ["rec1", "rec2", ...],
   "confidence": <0-100>,
-  "reasoning": "brief explanation"
+  "reasoning": "brief explanation",
+  "designIndicators": {
+    "layoutApproach": "description of layout technique used",
+    "typography": "description of typography choices", 
+    "colorScheme": "description of color usage and sophistication",
+    "buttonStyle": "description of button design approach",
+    "overallAesthetic": "description of overall design philosophy",
+    "responsivenessApproach": "description of mobile responsiveness implementation"
+  }
 }`;
 
   try {
@@ -317,6 +479,14 @@ Analyze this desktop screenshot and provide scores (0-100 scale) for:
 - Navigation intuitiveness
 - Desktop conversion optimization
 
+5. DESIGN ERA INDICATORS:
+- Layout approach (table-based, float-based, flexbox, grid, CSS frameworks)
+- Typography style (web-safe fonts vs custom fonts vs modern typography)
+- Color scheme sophistication (basic colors vs gradients vs modern palettes)
+- Button design (basic buttons vs rounded vs flat vs modern interactive)
+- Overall aesthetic (skeuomorphic vs flat vs material vs modern minimalist)
+- Framework usage (bootstrap, custom CSS, modern frameworks)
+
 Respond with valid JSON only:
 {
   "visualDesign": <score 0-40>,
@@ -327,7 +497,15 @@ Respond with valid JSON only:
   "issues": ["issue1", "issue2", ...],
   "recommendations": ["rec1", "rec2", ...],
   "confidence": <0-100>,
-  "reasoning": "brief explanation"
+  "reasoning": "brief explanation",
+  "designIndicators": {
+    "layoutApproach": "description of layout technique used",
+    "typography": "description of typography choices", 
+    "colorScheme": "description of color usage and sophistication",
+    "buttonStyle": "description of button design approach",
+    "overallAesthetic": "description of overall design philosophy",
+    "frameworkUsage": "description of CSS framework or custom approach"
+  }
 }`;
 
   try {
@@ -529,6 +707,9 @@ export async function analyzeWebsiteComplete(input: AnalysisInput): Promise<Webs
     confidence = Math.round(confidence * 0.8);
   }
   
+  // Step 8.5: Determine design age
+  const designAge = determineDesignEra(mobileAnalysis, desktopAnalysis);
+  
   // Step 9: Generate reasoning
   const reasoning = `Analysis based on ${analysisStatus === 'SUCCESS' ? 'both mobile and desktop' : 
     analysisStatus === 'PARTIAL_MOBILE_ONLY' ? 'mobile only' : 'desktop only'} screenshots. ` +
@@ -551,7 +732,8 @@ export async function analyzeWebsiteComplete(input: AnalysisInput): Promise<Webs
       desktopAnalysis: desktopTokens,
       total: mobileTokens + desktopTokens
     },
-    analysisStatus
+    analysisStatus,
+    designAge
   };
   
   console.log(`Analysis completed for ${input.companyName}. Combined score: ${combinedScore}/100, Status: ${analysisStatus}`);
