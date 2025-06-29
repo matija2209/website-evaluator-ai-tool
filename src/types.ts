@@ -100,6 +100,75 @@ export interface CompanyProcessingState extends CompanyData {
   processingDate: string;
 }
 
+// Screenshot capture interfaces
+export interface ScreenshotConfig {
+  concurrency: number;           // Default: 1
+  pageTimeout: number;           // Default: 30000ms
+  scrollDelay: number;           // Default: 2000ms
+  jpegQuality: number;           // Default: 75
+  maxRetries: number;            // Default: 2
+  disableImages: boolean;        // Default: false (for faster loading)
+  enableContentWait: boolean;    // Default: true (wait for content to load)
+}
+
+export interface ScreenshotResult {
+  url: string;
+  domain: string;
+  companyName: string;
+  status: 'SUCCESS' | 'FAILED' | 'SKIPPED';
+  desktopSections: number;
+  mobileSections: number;
+  loadTimeMs: number;
+  errorMessage?: string;
+  retryCount: number;
+  timestamp: string;
+  screenshotPaths: {
+    desktop: string[];
+    mobile: string[];
+  };
+}
+
+export interface ViewportConfig {
+  name: 'desktop' | 'mobile';
+  width: number;
+  height: number;
+  sectionHeight: number;
+  overlap: number;
+}
+
+export interface BrowserPoolConfig {
+  maxBrowsers: number;
+  restartAfterPages: number;
+  launchTimeout: number;
+}
+
+// Extended CSV data structure for screenshot progress
+export interface ScreenshotProgressData {
+  Company_Name: string;
+  Cleaned_Name: string;
+  City: string;
+  Normalized_City: string;
+  Original_URL: string;
+  Discovered_Website: string;
+  Search_Status: string;
+  Search_Query: string;
+  Search_Error: string;
+  SERP_Position: string;
+  AI_Confidence: string;
+  AI_Reasoning: string;
+  Tokens_Used: string;
+  Multiple_Valid_Found: string;
+  Processing_Date: string;
+  // New screenshot columns
+  Screenshot_Status: string;
+  Desktop_Sections: string;
+  Mobile_Sections: string;
+  Screenshot_Error: string;
+  Load_Time_MS: string;
+  Screenshot_Retry_Count: string;
+  Screenshot_Timestamp: string;
+}
+
 // Run management
 export interface RunMetadata {
   runId: string;

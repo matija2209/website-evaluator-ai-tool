@@ -9,6 +9,7 @@
     "test": "ts-node test-infrastructure.ts",
     "test:phase2": "ts-node test-phase2.ts",
     "test:ai": "ts-node test-ai-validation.ts",
+    "screenshot": "npx ts-node -e \"require('./src/screenshotCapture').runScreenshotCapture(process.argv[2] || '20250629_110643', parseInt(process.argv[3]) || 1)\"",
     "dev": "ts-node --watch test-phase2.ts",
     "build": "tsc",
     "clean": "rm -rf dist"
@@ -30,7 +31,7 @@
     "fs-extra": "^11.3.0",
     "googleapis": "^150.0.1",
     "ink": "^6.0.1",
-    "puppeteer": "^24.10.2",
+    "playwright": "^1.53.1",
     "react": "^19.1.0"
   },
   "devDependencies": {
