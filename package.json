@@ -4,13 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "ts-node test-phase2.ts",
+    "start:csv": "ts-node test-phase2.ts",
+    "test": "ts-node test-infrastructure.ts",
+    "test:phase2": "ts-node test-phase2.ts",
+    "test:ai": "ts-node test-ai-validation.ts",
+    "dev": "ts-node --watch test-phase2.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.11.0",
   "dependencies": {
+    "@google/generative-ai": "^0.19.0",
     "@googleapis/customsearch": "^4.0.1",
     "@types/react": "^19.1.8",
     "axios": "^1.10.0",

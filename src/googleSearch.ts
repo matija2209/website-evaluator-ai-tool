@@ -4,16 +4,20 @@ import {
   SearchOptions, 
   SearchResult, 
   CompanySearchInput, 
-  SearchResponse 
+  SearchResponse,
+  AIValidationRequest
 } from './types';
 import { ALL_EXCLUDED_DOMAINS } from './exclusionLists';
 import { config } from '../config';
+import { AIValidationService } from './aiValidationService';
 
 export class GoogleSearchService {
   private customSearch: customsearch_v1.Customsearch;
+  private aiValidationService: AIValidationService;
 
   constructor() {
     this.customSearch = google.customsearch('v1');
+    this.aiValidationService = new AIValidationService();
   }
 
   /**
@@ -118,21 +122,73 @@ export class GoogleSearchService {
   }
 
   /**
-   * Placeholder best match selection function (to be replaced with AI)
+   * AI-powered best match selection using Gemini for validation
    */
-  private selectBestMatch(
+  private async selectBestMatch(
+    results: SearchResult[],
+    companyData: CompanySearchInput
+  ): Promise<{ selectedResult: SearchResult | null; serpPosition?: number; aiValidation?: any }> {
+    if (results.length === 0) {
+      return { selectedResult: null };
+    }
+
+    try {
+      // Prepare AI validation request
+      const aiRequest: AIValidationRequest = {
+        companyName: companyData.companyName,
+        location: `${companyData.city}, ${companyData.country || 'Slovenia'}`,
+        businessActivity: companyData.businessActivity,
+        searchResults: results
+      };
+
+      // Get AI validation
+      const aiValidation = await this.aiValidationService.validateSearchResults(aiRequest);
+
+      if (aiValidation.isMatch && aiValidation.selectedResultIndex !== null) {
+        const selectedResult = results[aiValidation.selectedResultIndex];
+        const serpPosition = aiValidation.selectedResultIndex + 1; // Convert to 1-based
+        
+        return {
+          selectedResult,
+          serpPosition,
+          aiValidation
+        };
+      } else {
+        // AI found no suitable results
+        return {
+          selectedResult: null,
+          aiValidation
+        };
+      }
+
+    } catch (error) {
+      console.error('❌ AI validation failed, falling back to simple logic:', error);
+      
+      // Fallback to simple logic if AI fails
+      const fallbackResult = this.fallbackBestMatch(results, companyData);
+      return {
+        selectedResult: fallbackResult,
+        serpPosition: fallbackResult ? 1 : undefined, // First result if found
+        aiValidation: {
+          selectedResultIndex: fallbackResult ? 0 : null,
+          confidence: 0.5, // Low confidence for fallback
+          reasoning: 'AI validation failed, used fallback logic',
+          isMatch: !!fallbackResult,
+          tokensUsed: 0,
+          multipleValidFound: false
+        }
+      };
+    }
+  }
+
+  /**
+   * Fallback best match selection (original simple logic)
+   */
+  private fallbackBestMatch(
     results: SearchResult[],
     companyData: CompanySearchInput
   ): SearchResult | null {
-    // TODO: This will be replaced with AI-powered matching
-    // For now, return first valid result or null
-    
     if (results.length === 0) return null;
-    
-    // Simple placeholder logic:
-    // 1. Prefer results with company name in domain
-    // 2. Prefer HTTPS over HTTP
-    // 3. Return first result otherwise
     
     const companyNameLower = companyData.companyName.toLowerCase();
     
@@ -259,15 +315,18 @@ export class GoogleSearchService {
         return searchResponse;
       }
 
-      // Select best match (placeholder implementation)
-      const bestMatch = this.selectBestMatch(searchResponse.results, companyData);
+      // Select best match using AI validation
+      const matchResult = await this.selectBestMatch(searchResponse.results, companyData);
       
-      if (bestMatch) {
-        console.log(`✅ Found website for ${companyData.companyName}: ${bestMatch.link}`);
-        // Return only the best match
+      if (matchResult.selectedResult) {
+        console.log(`✅ Found website for ${companyData.companyName}: ${matchResult.selectedResult.link}`);
+        // Return enhanced response with AI validation data
         return {
           ...searchResponse,
-          results: [bestMatch]
+          results: [matchResult.selectedResult],
+          aiValidatedResult: matchResult.selectedResult,
+          serpPosition: matchResult.serpPosition,
+          aiValidation: matchResult.aiValidation
         };
       } else {
         console.log(`❌ No suitable match found for ${companyData.companyName}`);
@@ -275,6 +334,8 @@ export class GoogleSearchService {
           ...searchResponse,
           success: false,
           results: [],
+          aiValidatedResult: undefined,
+          serpPosition: undefined,
           errorMessage: 'No suitable website match found'
         };
       }

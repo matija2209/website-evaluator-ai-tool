@@ -11,8 +11,11 @@ export const config = {
     rateLimitDelay: 100
   },
   gemini: {
-    apiKey: process.env.GEMINI_API_KEY!,
-    model: 'gemini-2.5-flash'
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: 'gemini-2.0-flash-exp',
+    rateLimitDelay: 500, // 2 requests per second
+    maxRetries: 2,
+    temperature: 0.1, // Low temperature for consistent results
   },
   processing: {
     batchSize: 15,

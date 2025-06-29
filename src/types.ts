@@ -40,6 +40,26 @@ export interface SearchResponse {
   totalResults: number;
   errorMessage?: string;
   searchVariationUsed?: string; // Which query variation worked
+  aiValidatedResult?: SearchResult;
+  serpPosition?: number; // 1-based SERP position of selected result
+  aiValidation?: AIValidationResult; // AI validation data
+}
+
+// AI Validation interfaces
+export interface AIValidationResult {
+  selectedResultIndex: number | null; // 0-based SERP position, null if no suitable result
+  confidence: number; // 0-1 confidence score
+  reasoning: string; // AI explanation for the selection
+  isMatch: boolean; // Whether any result is suitable
+  tokensUsed: number; // Token cost tracking
+  multipleValidFound: boolean; // Multiple good matches detected
+}
+
+export interface AIValidationRequest {
+  companyName: string;
+  location: string;
+  businessActivity?: string;
+  searchResults: SearchResult[]; // From Google Search
 }
 
 // Processing status types
@@ -60,6 +80,8 @@ export interface CompanyProcessingState extends CompanyData {
   searchStatus: ProcessingStatus;
   searchQuery?: string;
   searchError?: string;
+  aiValidation?: AIValidationResult;
+  serpPosition?: number; // 1-based position of selected result
   screenshotPaths?: {
     desktop: string[];
     mobile: string[];

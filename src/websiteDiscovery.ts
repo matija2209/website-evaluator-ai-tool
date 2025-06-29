@@ -29,26 +29,38 @@ export class WebsiteDiscoveryService {
   }
 
   /**
-   * Process a single company for website discovery
+   * Process a single company for website discovery with AI validation
    */
   private async processCompany(company: CompanyProcessingState): Promise<CompanyProcessingState> {
     console.log(`\n🏢 Processing: ${company.title} (${company.cleanedName})`);
     
     try {
       const searchInput = this.prepareSearchInput(company);
+      console.log(`🔍 Google Search: "${searchInput.companyName}" ${searchInput.city} ${searchInput.country}`);
+      
       const searchResponse = await this.searchService.searchCompanyWebsite(searchInput);
 
       if (searchResponse.success && searchResponse.results.length > 0) {
         const bestResult = searchResponse.results[0];
+        
+        // Enhanced logging with AI validation data
+        if (searchResponse.serpPosition) {
+          console.log(`✅ Success: ${bestResult.link} (SERP position: ${searchResponse.serpPosition}/${searchResponse.totalResults || 'N/A'})`);
+        } else {
+          console.log(`✅ Success: ${bestResult.link}`);
+        }
         
         return {
           ...company,
           discoveredWebsite: bestResult.link,
           searchStatus: 'WEBSITE_DISCOVERED',
           searchQuery: searchResponse.searchQuery,
+          serpPosition: searchResponse.serpPosition,
+          aiValidation: searchResponse.aiValidation,
           processingDate: new Date().toISOString()
         };
       } else {
+        console.log(`❌ No suitable website found`);
         return {
           ...company,
           searchStatus: 'NO_WEBSITE_FOUND',

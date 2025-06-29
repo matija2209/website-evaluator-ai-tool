@@ -93,7 +93,7 @@ export class CsvProcessor {
   }
 
   /**
-   * Write website discovery progress to CSV
+   * Write website discovery progress to CSV with AI validation data
    */
   static async writeWebsiteDiscoveryProgress(
     runDir: string, 
@@ -111,11 +111,25 @@ export class CsvProcessor {
         { id: 'searchStatus', title: 'Search_Status' },
         { id: 'searchQuery', title: 'Search_Query' },
         { id: 'searchError', title: 'Search_Error' },
+        { id: 'serpPosition', title: 'SERP_Position' },
+        { id: 'aiConfidence', title: 'AI_Confidence' },
+        { id: 'aiReasoning', title: 'AI_Reasoning' },
+        { id: 'tokensUsed', title: 'Tokens_Used' },
+        { id: 'multipleValidFound', title: 'Multiple_Valid_Found' },
         { id: 'processingDate', title: 'Processing_Date' }
       ]
     });
 
-    await writer.writeRecords(companies);
+    // Transform data to include AI validation fields
+    const transformedData = companies.map(company => ({
+      ...company,
+      aiConfidence: company.aiValidation?.confidence || '',
+      aiReasoning: company.aiValidation?.reasoning || '',
+      tokensUsed: company.aiValidation?.tokensUsed || '',
+      multipleValidFound: company.aiValidation?.multipleValidFound || ''
+    }));
+
+    await writer.writeRecords(transformedData);
     console.log(`📝 Website discovery progress saved to ${runDir}/website-discovery-progress.csv`);
   }
 

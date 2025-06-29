@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@google/generative-ai':
+        specifier: ^0.19.0
+        version: 0.19.0
       '@googleapis/customsearch':
         specifier: ^4.0.1
         version: 4.0.1
@@ -78,6 +81,10 @@ packages:
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
     engines: {node: '>=12'}
+
+  '@google/generative-ai@0.19.0':
+    resolution: {integrity: sha512-iGf/62v3sTwtEJGJY6S5m7PfkglU8hi1URaxqIjiRg1OItV27xyc4aVeR0og8cDkZFkUlGZKv+23bJtT1QWFzQ==}
+    engines: {node: '>=18.0.0'}
 
   '@googleapis/customsearch@4.0.1':
     resolution: {integrity: sha512-Kd08s3UGrX+dTdf2HyHrVc9156DGpd/hC7fTt4KhcAzKOyCbnYGQFGD3l0kEaD0nBOEVeeZEzEtF52+3CIyc8w==}
@@ -1029,6 +1036,8 @@ snapshots:
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
+
+  '@google/generative-ai@0.19.0': {}
 
   '@googleapis/customsearch@4.0.1':
     dependencies:
