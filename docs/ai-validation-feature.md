@@ -53,11 +53,11 @@ The AI receives:
 Add to your `.env` file:
 ```bash
 # Existing variables
-GOOGLE_API_KEY=your_google_api_key
-GOOGLE_CSE_ID=your_custom_search_engine_id
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY
+GOOGLE_CLOUD_API_KEY=your_custom_search_engine_id
 
 # New: Required for AI validation
-GEMINI_API_KEY=your_gemini_api_key
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY
 ```
 
 ### AI Configuration
@@ -65,7 +65,7 @@ GEMINI_API_KEY=your_gemini_api_key
 Located in `config.ts`:
 ```typescript
 gemini: {
-  apiKey: process.env.GEMINI_API_KEY || '',
+  apiKey: process.env.GOOGLE_CLOUD_API_KEY || '',
   model: 'gemini-2.0-flash-exp',
   rateLimitDelay: 500, // 2 requests per second
   maxRetries: 2,
@@ -178,9 +178,9 @@ If AI validation fails:
 ### Missing API Key
 ```
 ❌ Missing required environment variables:
-   - GOOGLE_API_KEY: ✓
-   - GOOGLE_CSE_ID: ✓  
-   - GEMINI_API_KEY: ❌
+   - GOOGLE_CLOUD_API_KEY: ✓
+   - GOOGLE_CLOUD_API_KEY: ✓  
+   - GOOGLE_CLOUD_API_KEY: ❌
 ```
 
 ### Rate Limiting

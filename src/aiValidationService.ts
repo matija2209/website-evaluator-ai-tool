@@ -8,7 +8,7 @@ export class AIValidationService {
 
   constructor() {
     if (!config.gemini.apiKey) {
-      throw new Error('GEMINI_API_KEY is required for AI validation');
+      throw new Error('GOOGLE_CLOUD_API_KEY is required for AI validation');
     }
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
   }

@@ -184,8 +184,8 @@ dotenv.config();
 
 export const config = {
   google: {
-    apiKey: process.env.GOOGLE_API_KEY!,
-    customSearchEngineId: process.env.GOOGLE_CSE_ID!,
+    apiKey: process.env.GOOGLE_CLOUD_API_KEY!,
+    customSearchEngineId: process.env.GOOGLE_CLOUD_API_KEY!,
     maxResults: 10,
     rateLimitDelay: 100,        // ms between requests
     searchTimeout: 30000        // 30s timeout

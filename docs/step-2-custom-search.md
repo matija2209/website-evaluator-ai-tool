@@ -14,7 +14,7 @@ pnpm add -D @types/node
 ```typescript
 export const config = {
   google: {
-    apiKey: 'YOUR_GOOGLE_API_KEY',
+    apiKey: 'YOUR_GOOGLE_CLOUD_API_KEY',
     customSearchEngineId: 'YOUR_CUSTOM_SEARCH_ENGINE_ID',
     maxResults: 10, // Google Custom Search API max per request
     rateLimitDelay: 100 // ms between requests (Google allows 100 queries/day free, 10k paid)
@@ -25,8 +25,8 @@ export const config = {
 
 #### **Environment Variables (.env)**
 ```
-GOOGLE_API_KEY=your_api_key_here
-GOOGLE_CSE_ID=your_custom_search_engine_id_here
+GOOGLE_CLOUD_API_KEY=your_api_key_here
+GOOGLE_CLOUD_API_KEY=your_custom_search_engine_id_here
 ```
 
 ---

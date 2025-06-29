@@ -9,11 +9,11 @@ async function testAIValidation() {
   console.log('🧪 Testing AI-Powered Website Validation\n');
 
   // Check if required environment variables are set
-  if (!process.env.GOOGLE_API_KEY || !process.env.GOOGLE_CSE_ID || !process.env.GEMINI_API_KEY) {
+  if (!process.env.GOOGLE_CLOUD_API_KEY || !process.env.GOOGLE_CLOUD_API_KEY || !process.env.GOOGLE_CLOUD_API_KEY) {
     console.error('❌ Missing required environment variables:');
-    console.error('   - GOOGLE_API_KEY:', process.env.GOOGLE_API_KEY ? '✓' : '❌');
-    console.error('   - GOOGLE_CSE_ID:', process.env.GOOGLE_CSE_ID ? '✓' : '❌');
-    console.error('   - GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✓' : '❌');
+    console.error('   - GOOGLE_CLOUD_API_KEY:', process.env.GOOGLE_CLOUD_API_KEY ? '✓' : '❌');
+    console.error('   - GOOGLE_CLOUD_API_KEY:', process.env.GOOGLE_CLOUD_API_KEY ? '✓' : '❌');
+    console.error('   - GOOGLE_CLOUD_API_KEY:', process.env.GOOGLE_CLOUD_API_KEY ? '✓' : '❌');
     process.exit(1);
   }
 

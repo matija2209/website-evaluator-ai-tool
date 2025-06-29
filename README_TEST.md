@@ -9,9 +9,9 @@ Before running the test, you need to set up API credentials:
 Create a `.env` file in the project root with these variables:
 
 ```bash
-GOOGLE_API_KEY=your_google_api_key_here
-GOOGLE_CSE_ID=your_custom_search_engine_id_here
-GEMINI_API_KEY=your_gemini_api_key_here
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
+GOOGLE_CLOUD_API_KEY=your_custom_search_engine_id_here
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
 ```
 
 ### 2. Get Google Custom Search API Keys

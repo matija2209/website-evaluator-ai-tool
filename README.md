@@ -67,9 +67,9 @@ pnpm install
 Create a `.env` file with your API keys:
 
 ```env
-GOOGLE_API_KEY=your_google_api_key_here
-GOOGLE_CSE_ID=your_custom_search_engine_id_here
-GEMINI_API_KEY=your_gemini_api_key_here
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
+GOOGLE_CLOUD_API_KEY=your_custom_search_engine_id_here
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
 ```
 
 ## Usage

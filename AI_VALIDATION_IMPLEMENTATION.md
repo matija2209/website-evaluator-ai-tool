@@ -63,7 +63,7 @@ aiValidatedResult?: SearchResult;
 ### **Updated: `config.ts`**
 ```typescript
 gemini: {
-  apiKey: process.env.GEMINI_API_KEY || '',
+  apiKey: process.env.GOOGLE_CLOUD_API_KEY || '',
   model: 'gemini-2.0-flash-exp',
   rateLimitDelay: 500, // 2 requests per second
   maxRetries: 2,
@@ -72,7 +72,7 @@ gemini: {
 ```
 
 ### **Environment Variables:**
-- ✅ `GEMINI_API_KEY` configuration
+- ✅ `GOOGLE_CLOUD_API_KEY` configuration
 - ✅ Fallback handling for missing API keys
 - ✅ Clear error messages for missing configuration
 
@@ -142,7 +142,7 @@ gemini: {
 ## 🚀 **Ready to Use**
 
 ### **Quick Start:**
-1. **Set environment variable:** `GEMINI_API_KEY=your_key`
+1. **Set environment variable:** `GOOGLE_CLOUD_API_KEY=your_key`
 2. **Install dependencies:** `pnpm install` ✅ (Already done)
 3. **Test the feature:** `pnpm run test:ai`
 4. **Run full pipeline:** `pnpm run start:csv`

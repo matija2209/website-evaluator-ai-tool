@@ -177,9 +177,9 @@ Final Output CSV
 #### **`.env` Configuration**
 
 ```env
-GOOGLE_API_KEY=your_google_api_key_here
-GOOGLE_CSE_ID=your_custom_search_engine_id_here
-GEMINI_API_KEY=your_gemini_api_key_here
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
+GOOGLE_CLOUD_API_KEY=your_custom_search_engine_id_here
+GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
 ```
 
 #### **`config.ts`**
@@ -187,13 +187,13 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ```ts
 export const config = {
   google: {
-    apiKey: process.env.GOOGLE_API_KEY!,
-    customSearchEngineId: process.env.GOOGLE_CSE_ID!,
+    apiKey: process.env.GOOGLE_CLOUD_API_KEY!,
+    customSearchEngineId: process.env.GOOGLE_CLOUD_API_KEY!,
     maxResults: 10,
     rateLimitDelay: 100
   },
   gemini: {
-    apiKey: process.env.GEMINI_API_KEY!,
+    apiKey: process.env.GOOGLE_CLOUD_API_KEY!,
     model: 'gemini-1.5-flash'
   },
   processing: {
