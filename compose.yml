@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:8.2.1-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./runs:/app/runs
+      - ./uploads:/app/uploads
+      - ./.env:/app/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["pnpm", "run", "api"]
+
+  worker:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./runs:/app/runs
+      - ./uploads:/app/uploads
+      - ./.env:/app/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["pnpm", "run", "worker"]
+
+volumes:
+  redis_data:

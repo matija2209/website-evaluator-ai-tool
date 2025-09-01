@@ -1,6 +1,6 @@
-import { analyzeWebsiteComplete, AnalysisInput } from './src/aiAnalysisService';
-import { runWebsiteAnalysis } from './src/websiteAnalysisRunner';
-import path from 'path';
+import { analyzeWebsiteComplete, AnalysisInput } from '../src/aiAnalysisService';
+import { runWebsiteAnalysis } from '../src/websiteAnalysisRunner';
+
 
 async function testIndividualAnalysis() {
   console.log('🧪 Testing Individual Website Analysis');

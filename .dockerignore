@@ -1,0 +1,15 @@
+node_modules/
+.git/
+.gitignore
+README.md
+*.md
+.env
+runs/
+uploads/
+dist/
+.pnpm-store/
+coverage/
+.nyc_output/
+*.log
+.DS_Store
+Thumbs.db

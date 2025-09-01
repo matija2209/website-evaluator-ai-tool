@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
-import { GoogleSearchService } from './src/googleSearch';
-import { CompanySearchInput } from './src/types';
+import { GoogleSearchService } from '../src/googleSearch';
+import { CompanySearchInput } from '../src/types';
 
 // Load environment variables
 dotenv.config();

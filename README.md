@@ -37,7 +37,7 @@ This project transforms directory listings (from sources like bizi.si, zlatestra
       website-discovery-progress.csv
       screenshot-progress.csv
       output.csv
-  /src
+  /src                        # Core CLI business logic
     aiAnalysisService.ts      # Enhanced with design age estimation
     aiValidationService.ts
     csvProcessor.ts
@@ -48,12 +48,29 @@ This project transforms directory listings (from sources like bizi.si, zlatestra
     types.ts
     websiteAnalysisRunner.ts
     websiteDiscovery.ts
+  /api                        # 🆕 Professional API layer (added 2025-01-09)
+    server.ts                 # Express API server
+    worker.ts                 # BullMQ background worker
+    /routes                   # REST API endpoints
+      index.ts, health.ts, analysis.ts, jobs.ts, downloads.ts
+    /controllers              # Request handling logic
+      healthController.ts, analysisController.ts, jobsController.ts, downloadController.ts
+    /services                 # Business logic services
+      queueService.ts, fileService.ts, analysisService.ts, jobStatusService.ts
+    /middleware               # Express middleware
+      errorHandler.ts, uploadMiddleware.ts
+    /types                    # API-specific TypeScript types
+      api.ts, queue.ts
+    /config                   # Configuration management
+      redis.ts
   /docs
     intro.md
     step-2-custom-search.md
     step-3-screenshoot.md
     step-4-gemini.md
   config.ts
+  compose.yml                 # 🆕 Docker Compose for production API
+  Dockerfile                  # 🆕 Containerized API deployment
 ```
 
 ## Installation
@@ -64,6 +81,7 @@ pnpm install
 
 ### Dependencies
 
+**Core CLI Dependencies:**
 - `playwright` - For screenshot capture (browser automation)
 - `sharp` - For image compression and processing
 - `@google/generative-ai` - Gemini AI integration
@@ -73,6 +91,13 @@ pnpm install
 - `cheerio` - HTML parsing
 - `fs-extra` - File system utilities
 - `dayjs` - Date handling
+
+**🆕 API Dependencies (added 2025-01-09):**
+- `express` - Web framework for REST API
+- `bullmq` - Redis-based job queue for background processing
+- `ioredis` - Redis client
+- `cors` - Cross-origin resource sharing
+- `multer` - File upload middleware
 
 ## Environment Setup
 
@@ -84,34 +109,77 @@ GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
 
 ## Usage
 
-### Complete Pipeline (All Phases)
+### 🆕 **API Mode (Production Web Service) - Added 2025-01-09**
+
+Start the production API with Docker (recommended):
+
+```bash
+# 1. Create your .env file with API keys
+cp .env.example .env
+# Edit .env with your GOOGLE_CLOUD_API_KEY
+
+# 2. Start Redis + API + Worker services
+docker compose up -d
+
+# 3. Use the REST API
+curl -X POST http://localhost:3000/analyze -F "csv=@/path/to/companies.csv"
+# Returns: {"jobId": "123", "status": "queued", "estimatedTime": "6-10 hours"}
+
+# 4. Check job status
+curl http://localhost:3000/jobs/123
+
+# 5. Download results when complete  
+curl http://localhost:3000/download/[RUN_ID] -o results.csv
+```
+
+**Available API Endpoints:**
+- `GET /health` - Health check
+- `POST /analyze` - Upload CSV and start analysis (returns job ID)
+- `GET /jobs` - List all jobs
+- `GET /jobs/:jobId` - Get specific job status and progress
+- `DELETE /jobs/:jobId` - Delete/cancel job
+- `GET /download/:runId` - Download results CSV
+
+**Development API Mode:**
+```bash
+pnpm run dev:api      # API server with hot reload
+pnpm run dev:worker   # Background worker with hot reload
+```
+
+### **CLI Mode (Direct Processing)**
 
 ```bash
 # Phase 1 & 2: Website Discovery
-npm run start /path/to/companies.csv
+pnpm run start /path/to/companies.csv
 
 # Phase 3: Screenshot Capture
-npm run screenshot [RUN_ID] [concurrency]
-npm run screenshot 20250629_110643 1
+pnpm run screenshot [RUN_ID] [concurrency]
+pnpm run screenshot 20250629_110643 1
 
 # Phase 4: AI Analysis
-npm run analyze [RUN_ID] [force]
-npm run analyze 20250629_110643
-npm run analyze 20250629_110643 force  # Force reanalysis
+pnpm run analyze [RUN_ID] [force]
+pnpm run analyze 20250629_110643
+pnpm run analyze 20250629_110643 force  # Force reanalysis
 ```
 
 ### Individual Phase Commands
 
 ```bash
 # Testing commands
-npm run test                    # Infrastructure tests
-npm run test:phase2            # Website discovery tests  
-npm run test:ai-analysis       # AI analysis tests
+pnpm run test                    # Infrastructure tests
+pnpm run test:phase2            # Website discovery tests  
+pnpm run test:ai-analysis       # AI analysis tests
 
 # Development
-npm run dev                    # Watch mode for development
-npm run build                  # TypeScript compilation
-npm run clean                  # Clean build artifacts
+pnpm run dev                    # Watch mode for development
+pnpm run build                  # TypeScript compilation
+pnpm run clean                  # Clean build artifacts
+
+# 🆕 API commands (added 2025-01-09)
+pnpm run api                    # Start production API server
+pnpm run worker                 # Start background worker
+pnpm run dev:api               # API development with hot reload
+pnpm run dev:worker            # Worker development with hot reload
 ```
 
 ### Input CSV Format
@@ -250,19 +318,98 @@ Detailed implementation guides are available in the `/docs` folder:
 
 ## Development Status
 
-✅ **PROJECT COMPLETE** - All 4 phases implemented and tested!
+✅ **PROJECT COMPLETE** - All 4 phases implemented and tested + **🆕 Production API Added!**
 
 **Completed Phases:**
 - ✅ **Phase 1**: Foundation & Infrastructure
 - ✅ **Phase 2**: Website Discovery (AI-Enhanced)
 - ✅ **Phase 3**: Screenshot Capture  
 - ✅ **Phase 4**: AI Analysis & Scoring + **🎨 Design Age Estimation**
+- ✅ **🆕 Phase 5**: Production Web API (added 2025-01-09)
 
 **Live Testing Results:**
 - 100% success rate across all phases
 - 2 Slovenian companies analyzed end-to-end
 - Design age estimation working correctly (EARLY_2020S era detected)
 - Complete pipeline ready for production deployment
+- **🆕 Professional REST API with Docker deployment ready**
+
+---
+
+## 🆕 **API Development Session (2025-01-09)**
+
+### **What We Built Today:**
+
+**✅ Professional API Architecture:**
+- Clean separation: routes → controllers → services
+- Enterprise-grade folder structure (`/api` directory)
+- TypeScript interfaces for API requests/responses
+- Proper error handling and validation middleware
+
+**✅ Production Infrastructure:**
+- **Docker Compose** setup with Redis 8.2.1 + Node.js 22 LTS
+- **BullMQ** job queue for background processing (6-10 hour jobs)
+- **Multiple services**: API server + background worker + Redis
+- **Environment management** with `.env` file support
+
+**✅ RESTful API Endpoints:**
+- `POST /analyze` - Upload CSV, get job ID (non-blocking)
+- `GET /jobs/:jobId` - Real-time job status and progress
+- `GET /download/:runId` - Download completed results
+- `GET /jobs` - List all jobs with summary stats
+- `DELETE /jobs/:jobId` - Job cleanup
+
+**✅ Technical Improvements:**
+- **Converted CLI to API** without changing core business logic
+- **Removed duplicate files** (obsolete `api-server.ts`, `api-worker.ts`)
+- **Fixed Docker build** (removed useless `pnpm run build` step)
+- **Updated to latest versions** (Node 22 LTS, Redis 8.2.1-alpine)
+
+### **Architecture Highlights:**
+
+```
+/api/
+├── server.ts              # Express API server
+├── worker.ts             # BullMQ background processor  
+├── routes/               # Clean REST endpoints
+├── controllers/          # Request/response handling
+├── services/            # Business logic (Queue, File, Analysis)
+├── middleware/          # Error handling, file uploads
+├── types/              # TypeScript API interfaces
+└── config/             # Redis/queue configuration
+```
+
+### **Key Benefits Achieved:**
+
+**🎯 Dual Mode Operation:**
+- **CLI Mode**: Direct processing for development/testing
+- **API Mode**: Web service for production deployments
+
+**⚡ Non-Blocking Processing:**
+- Upload CSV → Get job ID immediately  
+- Check progress in real-time
+- Download results when complete
+
+**🏗️ Production Ready:**
+- Docker containerization with health checks
+- Redis persistence and job queue management
+- Proper error handling and file management
+- Professional API documentation
+
+**💡 Zero Business Logic Changes:**
+- Your original `/src` pipeline stays 100% unchanged
+- Same AI analysis, screenshot capture, website discovery
+- API is just a clean wrapper around existing functionality
+
+### **Ready for Production:**
+```bash
+docker compose up -d  # Start Redis + API + Worker
+# Upload 717-company CSV via API
+# Monitor progress via REST endpoints  
+# Download results when complete
+```
+
+The project now supports both **direct CLI usage** for development and **production web API** for scalable deployments! 🚀
 
 ## License
 

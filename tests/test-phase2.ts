@@ -1,5 +1,5 @@
-import { WebsiteDiscoveryService } from './src/websiteDiscovery';
-import path from 'path';
+import { WebsiteDiscoveryService } from '../src/websiteDiscovery';
+
 
 async function testPhase2() {
   console.log(`🧪 Testing Phase 2: Website Discovery with 3 companies`);

@@ -1,6 +1,6 @@
-import { CsvProcessor } from './src/csvProcessor';
-import { RunManager } from './src/runManager';
-import path from 'path';
+import { CsvProcessor } from '../src/csvProcessor';
+import { RunManager } from '../src/runManager';
+
 
 async function testInfrastructure() {
   console.log(`🧪 Testing Infrastructure: CSV Processing & Run Management`);
