@@ -443,7 +443,7 @@ async function main(): Promise<void> {
 
   const outputPath =
     options.output ||
-    path.resolve(process.cwd(), `bizi-profile-scrape-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`);
+    path.resolve(process.cwd(), 'output', `bizi-profile-scrape-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`);
 
   console.log(`[INFO] Scraping ${inputRecords.length} BIZI profile page(s)`);
   console.log(`[INFO] Output: ${outputPath}`);
