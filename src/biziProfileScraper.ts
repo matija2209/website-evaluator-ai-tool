@@ -3,6 +3,9 @@ import csv from 'csv-parser';
 import { createObjectCsvWriter } from 'csv-writer';
 import fs from 'fs-extra';
 import path from 'path';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 type RawRow = Record<string, string>;
 
@@ -42,6 +45,8 @@ interface CliOptions {
   concurrency: number;
   limit?: number;
   headful: boolean;
+  proxies?: string[];
+  batchSize: number;
 }
 
 const URL_COLUMN_CANDIDATES = [
@@ -61,6 +66,7 @@ function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     concurrency: 3,
     headful: false,
+    batchSize: 50,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -80,16 +86,26 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === '--concurrency') {
       options.concurrency = Number(argv[i + 1]) || options.concurrency;
       i += 1;
+    } else if (arg === '--batchSize') {
+      options.batchSize = Number(argv[i + 1]) || options.batchSize;
+      i += 1;
     } else if (arg === '--limit') {
       options.limit = Number(argv[i + 1]) || undefined;
       i += 1;
     } else if (arg === '--headful') {
       options.headful = true;
+    } else if (arg === '--proxies') {
+      options.proxies = argv[i + 1].split(',').map(p => p.trim()).filter(Boolean);
+      i += 1;
     } else if (arg === '--help' || arg === '-h') {
       printUsageAndExit(0);
     } else {
       console.warn(`[WARN] Ignoring unknown argument: ${arg}`);
     }
+  }
+
+  if (!options.proxies && process.env.SCRAPER_PROXIES) {
+    options.proxies = process.env.SCRAPER_PROXIES.split(',').map(p => p.trim()).filter(Boolean);
   }
 
   if (!options.input && !options.url) {
@@ -110,8 +126,10 @@ function printUsageAndExit(code: number): never {
     '  --output <path>       Output CSV path',
     '  --url <url>           Scrape a single BIZI profile URL',
     '  --concurrency <n>     Number of parallel pages, default 3',
+    '  --batchSize <n>       Process in chunks of n URLs, default 50',
     '  --limit <n>           Limit number of CSV rows to process',
     '  --headful             Launch visible Chrome instead of headless',
+    '  --proxies <list>      Comma-separated list of HTTP proxies (e.g. http://proxy1,http://proxy2)',
   ].join('\n');
 
   console.error(usage);
@@ -293,16 +311,27 @@ function emptyRecord(sourceUrl: string, sourceRow: RawRow): ScrapedProfileRecord
   };
 }
 
-async function scrapeProfile(browser: Browser, record: InputRecord): Promise<ScrapedProfileRecord> {
+async function scrapeProfile(browser: Browser, record: InputRecord, proxyUrl?: string): Promise<ScrapedProfileRecord> {
   const result = emptyRecord(record.sourceUrl, record.sourceRow);
-  const context = await browser.newContext({
+  const contextOptions: any = {
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     viewport: { width: 1440, height: 1200 },
-  });
+  };
+
+  if (proxyUrl) {
+    contextOptions.proxy = { server: proxyUrl };
+  }
+
+  const context = await browser.newContext(contextOptions);
 
   try {
     const page = await context.newPage();
+    
+    // Add a random delay between 2000ms and 5000ms to mimic human behavior and avoid blocking
+    const randomDelay = Math.floor(Math.random() * 3000) + 2000;
+    await new Promise((resolve) => setTimeout(resolve, randomDelay));
+
     await page.goto(record.sourceUrl, {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
@@ -348,7 +377,62 @@ async function scrapeProfile(browser: Browser, record: InputRecord): Promise<Scr
   }
 }
 
-async function writeOutput(records: ScrapedProfileRecord[], outputPath: string): Promise<void> {
+async function getAlreadyScrapedUrls(outputPath: string): Promise<Set<string>> {
+  const scrapedUrls = new Set<string>();
+  if (await fs.pathExists(outputPath)) {
+    return new Promise((resolve, reject) => {
+      fs.createReadStream(outputPath)
+        .pipe(csv())
+        .on('data', (row: any) => {
+          if (row.status === 'SUCCESS' && row.sourceUrl) {
+            scrapedUrls.add(row.sourceUrl);
+          }
+        })
+        .on('end', () => resolve(scrapedUrls))
+        .on('error', reject);
+    });
+  }
+  return scrapedUrls;
+}
+
+function verifyBatchQuality(batchResults: ScrapedProfileRecord[]): { ok: boolean; message: string } {
+  if (batchResults.length === 0) return { ok: true, message: 'Empty batch' };
+
+  let failedCount = 0;
+  let missingKeyFields = 0;
+  const keyFields = ['companyName', 'taxNumber', 'registrationNumber'];
+
+  for (const result of batchResults) {
+    if (result.status === 'FAILED') {
+      failedCount++;
+      continue;
+    }
+
+    let missing = 0;
+    for (const field of keyFields) {
+      if (!result[field as keyof ScrapedProfileRecord]) {
+        missing++;
+      }
+    }
+    if (missing >= 2) {
+      missingKeyFields++;
+    }
+  }
+
+  const failedRate = failedCount / batchResults.length;
+  const missingRate = missingKeyFields / batchResults.length;
+
+  if (failedRate > 0.2) {
+    return { ok: false, message: `High failure rate: ${(failedRate * 100).toFixed(1)}% failed.` };
+  }
+  if (missingRate > 0.3) {
+    return { ok: false, message: `High degradation: ${(missingRate * 100).toFixed(1)}% missing key data.` };
+  }
+
+  return { ok: true, message: `Quality OK (Failed: ${(failedRate * 100).toFixed(1)}%, Missing data: ${(missingRate * 100).toFixed(1)}%)` };
+}
+
+async function writeOutput(records: ScrapedProfileRecord[], outputPath: string, append: boolean): Promise<void> {
   const keySet = new Set<string>();
 
   records.forEach((record) => {
@@ -390,6 +474,7 @@ async function writeOutput(records: ScrapedProfileRecord[], outputPath: string):
   const writer = createObjectCsvWriter({
     path: outputPath,
     header: headers,
+    append: append,
   });
 
   await writer.writeRecords(records);
@@ -435,39 +520,73 @@ async function buildInput(options: CliOptions): Promise<InputRecord[]> {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  const inputRecords = await buildInput(options);
-
-  if (inputRecords.length === 0) {
-    throw new Error('No valid BIZI profile URLs found in the input.');
-  }
-
   const outputPath =
     options.output ||
     path.resolve(process.cwd(), 'output', `bizi-profile-scrape-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`);
+
+  let inputRecords = await buildInput(options);
+
+  const alreadyScraped = await getAlreadyScrapedUrls(outputPath);
+  if (alreadyScraped.size > 0) {
+    const originalCount = inputRecords.length;
+    inputRecords = inputRecords.filter(r => !alreadyScraped.has(r.sourceUrl));
+    console.log(`[INFO] Idempotency: Skipped ${originalCount - inputRecords.length} URLs already successfully scraped.`);
+  }
+
+  if (inputRecords.length === 0) {
+    console.log('[INFO] No URLs to process (all already scraped or none provided).');
+    return;
+  }
 
   console.log(`[INFO] Scraping ${inputRecords.length} BIZI profile page(s)`);
   console.log(`[INFO] Output: ${outputPath}`);
 
   const browser = await launchBrowser(options.headful);
 
-  try {
-    const results = await runWithConcurrency(
-      inputRecords,
-      options.concurrency,
-      async (record, index) => {
-        console.log(`[INFO] [${index + 1}/${inputRecords.length}] ${record.sourceUrl}`);
-        const scraped = await scrapeProfile(browser, record);
-        console.log(`[INFO] [${index + 1}/${inputRecords.length}] ${scraped.status}`);
-        if (scraped.error) {
-          console.log(`[WARN] ${scraped.error}`);
-        }
-        return scraped;
-      }
-    );
+  const proxyList: (string | undefined)[] = [undefined];
+  if (options.proxies && options.proxies.length > 0) {
+    proxyList.push(...options.proxies);
+  }
 
-    await writeOutput(results, outputPath);
-    const successCount = results.filter((item) => item.status === 'SUCCESS').length;
-    console.log(`[INFO] Finished. ${successCount}/${results.length} succeeded.`);
+  try {
+    const batchSize = options.batchSize;
+    let globalIndex = 0;
+
+    for (let i = 0; i < inputRecords.length; i += batchSize) {
+      const batchRecords = inputRecords.slice(i, i + batchSize);
+      console.log(`\n[INFO] Starting batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(inputRecords.length / batchSize)} (${batchRecords.length} records)`);
+
+      const batchResults = await runWithConcurrency(
+        batchRecords,
+        options.concurrency,
+        async (record, index) => {
+          const currentIndex = globalIndex + index;
+          const proxyUrl = proxyList[currentIndex % proxyList.length];
+          console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${record.sourceUrl} ${proxyUrl ? `(Proxy: ${proxyUrl})` : '(No proxy)'}`);
+          const scraped = await scrapeProfile(browser, record, proxyUrl);
+          console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${scraped.status}`);
+          if (scraped.error) {
+            console.log(`[WARN] ${scraped.error}`);
+          }
+          return scraped;
+        }
+      );
+
+      globalIndex += batchRecords.length;
+
+      const append = await fs.pathExists(outputPath);
+      await writeOutput(batchResults, outputPath, append);
+
+      const quality = verifyBatchQuality(batchResults);
+      if (!quality.ok) {
+        console.error(`\n[ERROR] Data quality degradation detected: ${quality.message}`);
+        console.error(`[ERROR] Pausing scraper to prevent burning proxies or getting blocked.`);
+        process.exit(1);
+      } else {
+        console.log(`[INFO] Batch quality verification passed: ${quality.message}`);
+      }
+    }
+    console.log(`\n[INFO] Finished all batches successfully.`);
   } finally {
     await browser.close();
   }

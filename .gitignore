@@ -14,7 +14,8 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
-
+output/*
+input/*
 # nyc test coverage
 .nyc_output
 

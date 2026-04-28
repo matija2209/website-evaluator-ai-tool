@@ -19,7 +19,8 @@
     "api": "ts-node api/server.ts",
     "dev:api": "ts-node --watch api/server.ts",
     "worker": "ts-node api/worker.ts",
-    "dev:worker": "ts-node --watch api/worker.ts"
+    "dev:worker": "ts-node --watch api/worker.ts",
+    "test-proxies": "ts-node src/testProxies.ts"
   },
   "keywords": [],
   "author": "",

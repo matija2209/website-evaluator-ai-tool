@@ -11,8 +11,10 @@ This CLI tool is a Playwright-based web scraper designed to automate the extract
   - TRR (Bank Account) Summaries (Open, Closed, Blocked accounts, Foreign accounts)
 - **Automatic Output Directory**: Saves results in an `output/` directory by default.
 - **CSV Output Mapping**: When using a CSV input, all original columns are preserved and the newly extracted data is appended as new columns.
-- **Concurrency Support**: Run multiple Playwright pages in parallel to speed up batch processing.
-- **Error Resiliency**: Gracefully handles page loading issues or extraction failures without stopping the entire batch run.
+- **Concurrency & Stealth**: Run multiple Playwright pages in parallel. The script uses random delays (2-5s) between requests and rotates your defined proxies to avoid rate limiting.
+- **Batch Processing & Quality Control**: Automatically saves results incrementally in chunks (`--batchSize`). Validates data quality after every batch, pausing immediately if scraping degradation or blocking is detected.
+- **Idempotency (Resume Scrapes)**: If the scraper is paused, simply run it again pointing to the same `--output` file. It will automatically detect and skip URLs that have already been scraped successfully.
+- **Error Resiliency**: Gracefully handles page loading issues or extraction failures without stopping the entire run, unless failure rates exceed the quality threshold.
 
 ## Prerequisites
 
@@ -46,11 +48,13 @@ npm run scrape:bizi-profiles -- --input path/to/input.csv
 ### Options & Flags
 
 - `--input <path>`: Path to the input CSV file containing BIZI profile URLs.
-- `--output <path>`: (Optional) Path for the generated output CSV. Defaults to `output/bizi-profile-scrape-[timestamp].csv`.
+- `--output <path>`: (Optional) Path for the generated output CSV. Defaults to `output/bizi-profile-scrape-[timestamp].csv`. Pointing this to an existing CSV will automatically skip previously scraped URLs.
 - `--url <url>`: Scrape a single BIZI profile URL instead of reading from a CSV.
 - `--concurrency <n>`: Set the number of parallel pages/browsers to run. Default is `3`.
+- `--batchSize <n>`: Process URLs in batches of `n`. After each batch, data is saved to the CSV and quality is verified. Default is `50`.
 - `--limit <n>`: Limit the number of CSV rows to process (useful for testing on large datasets).
 - `--headful`: Launch a visible Chrome browser window instead of running headlessly (useful for debugging).
+- `--proxies <list>`: Comma-separated list of HTTP proxies (e.g., `http://proxy1:8080,http://proxy2:8080`). The scraper will rotate between these proxies and your current machine (no proxy). You can also set this via the `SCRAPER_PROXIES` variable in your `.env` file.
 
 **Examples:**
 
@@ -59,9 +63,34 @@ Run a batch scrape with 5 parallel processes and output to a specific file:
 npm run scrape:bizi-profiles -- --input list.csv --output results.csv --concurrency 5
 ```
 
+Run a batch scrape while rotating multiple proxies:
+```bash
+npm run scrape:bizi-profiles -- --input list.csv --proxies "http://192.168.64.108:8080,http://192.168.64.105:8080"
+```
+
 Test a large CSV by only processing the first 10 rows visibly:
 ```bash
 npm run scrape:bizi-profiles -- --input massive-list.csv --limit 10 --headful
+```
+
+### Environment Variables (.env)
+
+You can define your proxies in a `.env` file at the root of the project to avoid passing them via the CLI every time:
+
+```env
+SCRAPER_PROXIES="http://192.168.64.108:8080,http://192.168.64.105:8080"
+```
+
+### Testing Proxies
+
+A dedicated CLI script is included to test your proxies and verify their public IPs:
+
+```bash
+# Tests the proxies defined in your .env file
+npm run test-proxies
+
+# Test specific proxies manually
+npm run test-proxies -- --proxies "http://192.168.64.108:8080,http://192.168.64.105:8080"
 ```
 
 ## Output Format
