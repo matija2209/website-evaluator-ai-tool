@@ -160,6 +160,11 @@ pnpm run screenshot 20250629_110643 1
 pnpm run analyze [RUN_ID] [force]
 pnpm run analyze 20250629_110643
 pnpm run analyze 20250629_110643 force  # Force reanalysis
+
+# Bizi.si Profile Scraper
+# For extracting company profiles directly from Bizi.si pages
+npm run scrape:bizi-profiles -- --help
+# See README-bizi-scraper.md for full details
 ```
 
 ### Individual Phase Commands
