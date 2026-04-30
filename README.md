@@ -274,6 +274,14 @@ Extract rich data from specific sources or site structures.
 # Extract full company profiles (address, tax info, TRR) from Bizi.si
 npm run scrape:bizi -- --input input.csv --output output.csv
 
+# Optional pacing controls (helps reduce bursts / throttling)
+# Adds a fixed delay + random jitter before each request
+npm run scrape:bizi -- --input input.csv --output output.csv --concurrency 10 --delay-ms 400 --jitter-ms 300
+
+# Resume safely by reusing the same output file:
+# skips URLs already marked SUCCESS with valid website + email
+npm run scrape:bizi -- --input input.csv --output output.csv --concurrency 10
+
 # SEO Metadata Scraper
 # Capture <title>, meta descriptions, JSON-LD, and body text
 npm run scrape:seo -- --input output.csv --urlColumn website
@@ -331,7 +339,7 @@ npm run test:sitemaps:full
 npm run debug:site <domain_or_url>
 
 # Proxy Tester
-# Verify connectivity and public IPs for proxies from SCRAPER_PROXIES_AUTH or SCRAPER_PROXIES
+# Verify connectivity and public IPs for proxies from SCRAPER_PROXIES_AUTH + SCRAPER_PROXIES
 npm run test-proxies
 
 # Results Merger
@@ -344,6 +352,12 @@ npm run merge:results
 npx ts-node src/urlRecoverer.ts [input_csv] [output_csv]
 # Example: npx ts-node src/urlRecoverer.ts output/bizi-results.csv input/final_list.csv
 ```
+
+**BIZI scraper runtime behavior (current):**
+- **Proxy source merge**: `SCRAPER_PROXIES_AUTH` and `SCRAPER_PROXIES` are combined (both are used).
+- **Per-proxy load progress**: in interactive terminals (TTY), live bars show GLOBAL + per-proxy assigned/in-flight/done/success/failed/avg-ms.
+- **Idempotent resume filter**: a row is considered already processed only when `status=SUCCESS` and both a valid `website` and `email` are present.
+- **CLI pacing controls**: `--delay-ms` (fixed delay) and `--jitter-ms` (extra random 0..N ms) are available on `scrape:bizi`.
 
 ---
 

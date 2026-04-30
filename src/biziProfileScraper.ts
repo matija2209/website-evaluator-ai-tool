@@ -4,6 +4,7 @@ import { createObjectCsvWriter } from 'csv-writer';
 import fs from 'fs-extra';
 import path from 'path';
 import * as dotenv from 'dotenv';
+import * as cliProgress from 'cli-progress';
 
 dotenv.config();
 
@@ -47,6 +48,9 @@ interface CliOptions {
   headful: boolean;
   proxies?: ProxyConfig[];
   batchSize: number;
+  delayMs: number;
+  jitterMs: number;
+  progress: boolean;
 }
 
 interface ProxyConfig {
@@ -54,6 +58,15 @@ interface ProxyConfig {
   username?: string;
   password?: string;
   raw: string;
+}
+
+interface ProxyProgressStats {
+  assigned: number;
+  inFlight: number;
+  done: number;
+  success: number;
+  failed: number;
+  totalDurationMs: number;
 }
 
 const URL_COLUMN_CANDIDATES = [
@@ -74,6 +87,9 @@ function parseArgs(argv: string[]): CliOptions {
     concurrency: 3,
     headful: false,
     batchSize: 50,
+    delayMs: 0,
+    jitterMs: 0,
+    progress: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -99,6 +115,16 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === '--limit') {
       options.limit = Number(argv[i + 1]) || undefined;
       i += 1;
+    } else if (arg === '--delayMs' || arg === '--delay-ms') {
+      options.delayMs = Math.max(0, Number(argv[i + 1]) || 0);
+      i += 1;
+    } else if (arg === '--jitterMs' || arg === '--jitter-ms') {
+      options.jitterMs = Math.max(0, Number(argv[i + 1]) || 0);
+      i += 1;
+    } else if (arg === '--no-progress') {
+      options.progress = false;
+    } else if (arg === '--progress') {
+      options.progress = true;
     } else if (arg === '--headful') {
       options.headful = true;
     } else if (arg === '--proxies') {
@@ -112,7 +138,9 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   if (!options.proxies) {
-    options.proxies = parseProxyList(process.env.SCRAPER_PROXIES_AUTH || process.env.SCRAPER_PROXIES);
+    options.proxies = parseProxyList(
+      [process.env.SCRAPER_PROXIES_AUTH, process.env.SCRAPER_PROXIES].filter(Boolean).join(',')
+    );
   }
 
   if (!options.input && !options.url) {
@@ -135,6 +163,10 @@ function printUsageAndExit(code: number): never {
     '  --concurrency <n>     Number of parallel pages, default 3',
     '  --batchSize <n>       Process in chunks of n URLs, default 50',
     '  --limit <n>           Limit number of CSV rows to process',
+    '  --delayMs <ms>        Base delay before each request (default 0)',
+    '  --jitterMs <ms>       Random extra delay 0..ms before each request (default 0)',
+    '  --progress            Enable live progress bars (TTY only)',
+    '  --no-progress         Disable live progress bars (default behavior)',
     '  --headful             Launch visible Chrome instead of headless',
     '  --proxies <list>      Comma-separated proxies: http://host:port, http://user:pass@host:port, or http://host:port|user|pass',
   ].join('\n');
@@ -189,6 +221,38 @@ function parseProxyList(value?: string): ProxyConfig[] {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => parseProxyEntry(entry));
+}
+
+function getProxyKey(proxy?: ProxyConfig): string {
+  return proxy?.raw || '__NO_PROXY__';
+}
+
+function getProxyLabel(proxy: ProxyConfig | undefined, index: number): string {
+  if (!proxy) {
+    return 'P0 no-proxy';
+  }
+  const serverHost = proxy.server.replace(/^https?:\/\//, '');
+  return `P${index} ${serverHost}`;
+}
+
+function avgDurationMs(stats: ProxyProgressStats): number {
+  if (stats.done === 0) {
+    return 0;
+  }
+  return Math.round(stats.totalDurationMs / stats.done);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getRequestDelayMs(options: CliOptions): number {
+  if (options.delayMs <= 0 && options.jitterMs <= 0) {
+    return 0;
+  }
+
+  const jitter = options.jitterMs > 0 ? Math.floor(Math.random() * (options.jitterMs + 1)) : 0;
+  return options.delayMs + jitter;
 }
 
 function slugifyOutputFolderName(filePath: string): string {
@@ -487,8 +551,8 @@ async function getAlreadyScrapedUrls(outputPath: string): Promise<Set<string>> {
       fs.createReadStream(outputPath)
         .pipe(csv())
         .on('data', (row: any) => {
-          const hasValidWebsite = row.website && row.website.trim() !== '' && row.website !== 'Več kontaktov v TIS-u';
-          if (row.status === 'SUCCESS' && row.sourceUrl && hasValidWebsite) {
+          const isSuccess = (row.status || '').toString().trim().toUpperCase() === 'SUCCESS';
+          if (isSuccess && row.sourceUrl) {
             scrapedUrls.add(row.sourceUrl);
           }
         })
@@ -642,12 +706,86 @@ async function main(): Promise<void> {
 
   console.log(`[INFO] Scraping ${inputRecords.length} BIZI profile page(s)`);
   console.log(`[INFO] Output: ${outputPath}`);
+  if (options.delayMs > 0 || options.jitterMs > 0) {
+    console.log(
+      `[INFO] Request pacing enabled: base delay ${options.delayMs}ms + random jitter 0-${options.jitterMs}ms`
+    );
+  }
 
   const browser = await launchBrowser(options.headful);
 
   const proxyList: (ProxyConfig | undefined)[] = [undefined];
   if (options.proxies && options.proxies.length > 0) {
     proxyList.push(...options.proxies);
+  }
+
+  const useProgressBars = options.progress && Boolean(process.stdout.isTTY);
+  const proxyStats = new Map<string, ProxyProgressStats>();
+  const proxyLabelByKey = new Map<string, string>();
+  const proxyBars = new Map<string, cliProgress.SingleBar>();
+  let globalStats: ProxyProgressStats = {
+    assigned: 0,
+    inFlight: 0,
+    done: 0,
+    success: 0,
+    failed: 0,
+    totalDurationMs: 0,
+  };
+  let progressBars: cliProgress.MultiBar | undefined;
+
+  for (let i = 0; i < proxyList.length; i += 1) {
+    const proxy = proxyList[i];
+    const key = getProxyKey(proxy);
+    const label = getProxyLabel(proxy, i);
+    proxyLabelByKey.set(key, label);
+    if (!proxyStats.has(label)) {
+      proxyStats.set(label, {
+        assigned: 0,
+        inFlight: 0,
+        done: 0,
+        success: 0,
+        failed: 0,
+        totalDurationMs: 0,
+      });
+    }
+  }
+
+  if (useProgressBars) {
+    progressBars = new cliProgress.MultiBar(
+      {
+        clearOnComplete: false,
+        hideCursor: true,
+        barsize: 18,
+        format: '{name} |{bar}| {percentage}% d:{done}/{total} a:{assigned} run:{inFlight} ok:{success} fail:{failed} avg:{avg}ms',
+      },
+      cliProgress.Presets.shades_classic
+    );
+
+    const globalBar = progressBars.create(inputRecords.length, 0, {
+      name: 'GLOBAL',
+      done: 0,
+      total: inputRecords.length,
+      assigned: 0,
+      inFlight: 0,
+      success: 0,
+      failed: 0,
+      avg: 0,
+    });
+    proxyBars.set('GLOBAL', globalBar);
+
+    for (const [label] of proxyStats) {
+      const bar = progressBars.create(inputRecords.length, 0, {
+        name: label,
+        done: 0,
+        total: inputRecords.length,
+        assigned: 0,
+        inFlight: 0,
+        success: 0,
+        failed: 0,
+        avg: 0,
+      });
+      proxyBars.set(label, bar);
+    }
   }
 
   try {
@@ -664,9 +802,90 @@ async function main(): Promise<void> {
         async (record, index) => {
           const currentIndex = globalIndex + index;
           const proxy = proxyList[currentIndex % proxyList.length];
-          console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${record.sourceUrl} ${proxy ? `(Proxy: ${proxy.raw})` : '(No proxy)'}`);
+          const proxyLabel = proxyLabelByKey.get(getProxyKey(proxy)) || 'unknown-proxy';
+          const stats = proxyStats.get(proxyLabel)!;
+
+          stats.assigned += 1;
+          stats.inFlight += 1;
+          globalStats.assigned += 1;
+          globalStats.inFlight += 1;
+
+          proxyBars.get(proxyLabel)?.update(stats.done, {
+            name: proxyLabel,
+            done: stats.done,
+            total: inputRecords.length,
+            assigned: stats.assigned,
+            inFlight: stats.inFlight,
+            success: stats.success,
+            failed: stats.failed,
+            avg: avgDurationMs(stats),
+          });
+          proxyBars.get('GLOBAL')?.update(globalStats.done, {
+            name: 'GLOBAL',
+            done: globalStats.done,
+            total: inputRecords.length,
+            assigned: globalStats.assigned,
+            inFlight: globalStats.inFlight,
+            success: globalStats.success,
+            failed: globalStats.failed,
+            avg: avgDurationMs(globalStats),
+          });
+
+          if (!useProgressBars) {
+            console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${record.sourceUrl} ${proxy ? `(Proxy: ${proxyLabel})` : '(No proxy)'}`);
+          }
+
+          const requestDelayMs = getRequestDelayMs(options);
+          if (requestDelayMs > 0) {
+            await sleep(requestDelayMs);
+          }
+
+          const startedAt = Date.now();
           const scraped = await scrapeProfile(browser, record, proxy);
-          console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${scraped.status}`);
+
+          const durationMs = Date.now() - startedAt;
+          stats.inFlight = Math.max(0, stats.inFlight - 1);
+          stats.done += 1;
+          stats.totalDurationMs += durationMs;
+          if (scraped.status === 'SUCCESS') {
+            stats.success += 1;
+          } else {
+            stats.failed += 1;
+          }
+
+          globalStats.inFlight = Math.max(0, globalStats.inFlight - 1);
+          globalStats.done += 1;
+          globalStats.totalDurationMs += durationMs;
+          if (scraped.status === 'SUCCESS') {
+            globalStats.success += 1;
+          } else {
+            globalStats.failed += 1;
+          }
+
+          proxyBars.get(proxyLabel)?.update(stats.done, {
+            name: proxyLabel,
+            done: stats.done,
+            total: inputRecords.length,
+            assigned: stats.assigned,
+            inFlight: stats.inFlight,
+            success: stats.success,
+            failed: stats.failed,
+            avg: avgDurationMs(stats),
+          });
+          proxyBars.get('GLOBAL')?.update(globalStats.done, {
+            name: 'GLOBAL',
+            done: globalStats.done,
+            total: inputRecords.length,
+            assigned: globalStats.assigned,
+            inFlight: globalStats.inFlight,
+            success: globalStats.success,
+            failed: globalStats.failed,
+            avg: avgDurationMs(globalStats),
+          });
+
+          if (!useProgressBars) {
+            console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${scraped.status}`);
+          }
           if (scraped.error) {
             console.log(`[WARN] ${scraped.error}`);
           }
@@ -690,6 +909,9 @@ async function main(): Promise<void> {
     }
     console.log(`\n[INFO] Finished all batches successfully.`);
   } finally {
+    if (progressBars) {
+      progressBars.stop();
+    }
     await browser.close();
   }
 }

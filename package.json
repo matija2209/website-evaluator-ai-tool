@@ -49,6 +49,7 @@
     "axios": "^1.11.0",
     "bullmq": "^5.58.4",
     "cheerio": "^1.1.2",
+    "cli-progress": "^3.12.0",
     "cors": "^2.8.5",
     "csv-parser": "^3.2.0",
     "csv-writer": "^1.6.0",
@@ -66,6 +67,7 @@
     "wappalyzer": "^6.10.66"
   },
   "devDependencies": {
+    "@types/cli-progress": "^3.11.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",

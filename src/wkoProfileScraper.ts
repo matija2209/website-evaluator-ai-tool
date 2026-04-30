@@ -203,7 +203,9 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   if (!options.proxies) {
-    options.proxies = parseProxyList(process.env.SCRAPER_PROXIES_AUTH || process.env.SCRAPER_PROXIES);
+    options.proxies = parseProxyList(
+      [process.env.SCRAPER_PROXIES_AUTH, process.env.SCRAPER_PROXIES].filter(Boolean).join(',')
+    );
   }
 
   if (!options.input && !options.url) {

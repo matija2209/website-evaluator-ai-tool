@@ -93,7 +93,9 @@ async function main() {
   if (proxiesArgIndex !== -1 && args[proxiesArgIndex + 1]) {
     proxies = parseProxyList(args[proxiesArgIndex + 1]);
   } else {
-    proxies = parseProxyList(process.env.SCRAPER_PROXIES_AUTH || process.env.SCRAPER_PROXIES);
+    proxies = parseProxyList(
+      [process.env.SCRAPER_PROXIES_AUTH, process.env.SCRAPER_PROXIES].filter(Boolean).join(',')
+    );
   }
 
   const proxyList: (ProxyConfig | undefined)[] = [undefined, ...proxies];
