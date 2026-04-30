@@ -45,8 +45,15 @@ interface CliOptions {
   concurrency: number;
   limit?: number;
   headful: boolean;
-  proxies?: string[];
+  proxies?: ProxyConfig[];
   batchSize: number;
+}
+
+interface ProxyConfig {
+  server: string;
+  username?: string;
+  password?: string;
+  raw: string;
 }
 
 const URL_COLUMN_CANDIDATES = [
@@ -95,7 +102,7 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === '--headful') {
       options.headful = true;
     } else if (arg === '--proxies') {
-      options.proxies = argv[i + 1].split(',').map(p => p.trim()).filter(Boolean);
+      options.proxies = parseProxyList(argv[i + 1]);
       i += 1;
     } else if (arg === '--help' || arg === '-h') {
       printUsageAndExit(0);
@@ -104,8 +111,8 @@ function parseArgs(argv: string[]): CliOptions {
     }
   }
 
-  if (!options.proxies && process.env.SCRAPER_PROXIES) {
-    options.proxies = process.env.SCRAPER_PROXIES.split(',').map(p => p.trim()).filter(Boolean);
+  if (!options.proxies) {
+    options.proxies = parseProxyList(process.env.SCRAPER_PROXIES_AUTH || process.env.SCRAPER_PROXIES);
   }
 
   if (!options.input && !options.url) {
@@ -129,11 +136,86 @@ function printUsageAndExit(code: number): never {
     '  --batchSize <n>       Process in chunks of n URLs, default 50',
     '  --limit <n>           Limit number of CSV rows to process',
     '  --headful             Launch visible Chrome instead of headless',
-    '  --proxies <list>      Comma-separated list of HTTP proxies (e.g. http://proxy1,http://proxy2)',
+    '  --proxies <list>      Comma-separated proxies: http://host:port, http://user:pass@host:port, or http://host:port|user|pass',
   ].join('\n');
 
   console.error(usage);
   process.exit(code);
+}
+
+function parseProxyEntry(entry: string): ProxyConfig {
+  const trimmed = entry.trim();
+  if (!trimmed) {
+    throw new Error('Empty proxy entry');
+  }
+
+  const authParts = trimmed.split('|');
+  if (authParts.length === 3) {
+    const [server, username, password] = authParts.map((part) => part.trim());
+    if (!server || !username || !password) {
+      throw new Error(`Invalid auth proxy entry: ${entry}`);
+    }
+    return { server, username, password, raw: trimmed };
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.username || parsed.password) {
+      const server = `${parsed.protocol}//${parsed.host}`;
+      return {
+        server,
+        username: decodeURIComponent(parsed.username),
+        password: decodeURIComponent(parsed.password),
+        raw: trimmed,
+      };
+    }
+  } catch {
+    // Keep plain proxy server as-is.
+  }
+
+  return {
+    server: trimmed,
+    raw: trimmed,
+  };
+}
+
+function parseProxyList(value?: string): ProxyConfig[] {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => parseProxyEntry(entry));
+}
+
+function slugifyOutputFolderName(filePath: string): string {
+  const baseName = path.basename(filePath, path.extname(filePath));
+  const normalized = baseName.normalize('NFKD').replace(/[^\x00-\x7F]/g, '');
+  const slug = normalized
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+
+  return slug || 'input';
+}
+
+function defaultOutputPath(options: CliOptions): string {
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+
+  if (options.input) {
+    return path.resolve(
+      process.cwd(),
+      'output',
+      slugifyOutputFolderName(options.input),
+      `bizi-profile-scrape-${timestamp}.csv`
+    );
+  }
+
+  return path.resolve(process.cwd(), 'output', `bizi-profile-scrape-${timestamp}.csv`);
 }
 
 function normalizeWhitespace(value: string | null | undefined): string {
@@ -311,7 +393,7 @@ function emptyRecord(sourceUrl: string, sourceRow: RawRow): ScrapedProfileRecord
   };
 }
 
-async function scrapeProfile(browser: Browser, record: InputRecord, proxyUrl?: string): Promise<ScrapedProfileRecord> {
+async function scrapeProfile(browser: Browser, record: InputRecord, proxy?: ProxyConfig): Promise<ScrapedProfileRecord> {
   const result = emptyRecord(record.sourceUrl, record.sourceRow);
   const contextOptions: any = {
     userAgent:
@@ -319,8 +401,12 @@ async function scrapeProfile(browser: Browser, record: InputRecord, proxyUrl?: s
     viewport: { width: 1440, height: 1200 },
   };
 
-  if (proxyUrl) {
-    contextOptions.proxy = { server: proxyUrl };
+  if (proxy) {
+    contextOptions.proxy = {
+      server: proxy.server,
+      username: proxy.username,
+      password: proxy.password,
+    };
   }
 
   const context = await browser.newContext(contextOptions);
@@ -538,9 +624,7 @@ async function buildInput(options: CliOptions): Promise<InputRecord[]> {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  const outputPath =
-    options.output ||
-    path.resolve(process.cwd(), 'output', `bizi-profile-scrape-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`);
+  const outputPath = options.output || defaultOutputPath(options);
 
   let inputRecords = await buildInput(options);
 
@@ -561,7 +645,7 @@ async function main(): Promise<void> {
 
   const browser = await launchBrowser(options.headful);
 
-  const proxyList: (string | undefined)[] = [undefined];
+  const proxyList: (ProxyConfig | undefined)[] = [undefined];
   if (options.proxies && options.proxies.length > 0) {
     proxyList.push(...options.proxies);
   }
@@ -579,9 +663,9 @@ async function main(): Promise<void> {
         options.concurrency,
         async (record, index) => {
           const currentIndex = globalIndex + index;
-          const proxyUrl = proxyList[currentIndex % proxyList.length];
-          console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${record.sourceUrl} ${proxyUrl ? `(Proxy: ${proxyUrl})` : '(No proxy)'}`);
-          const scraped = await scrapeProfile(browser, record, proxyUrl);
+          const proxy = proxyList[currentIndex % proxyList.length];
+          console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${record.sourceUrl} ${proxy ? `(Proxy: ${proxy.raw})` : '(No proxy)'}`);
+          const scraped = await scrapeProfile(browser, record, proxy);
           console.log(`[INFO] [${currentIndex + 1}/${inputRecords.length}] ${scraped.status}`);
           if (scraped.error) {
             console.log(`[WARN] ${scraped.error}`);
