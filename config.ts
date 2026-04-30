@@ -1,16 +1,10 @@
 import * as dotenv from 'dotenv';
-import { ScreenshotConfig, ViewportConfig, BrowserPoolConfig } from './src/types';
+import type { ScreenshotConfig, ViewportConfig, BrowserPoolConfig, ConsentHandlingConfig } from './src/types';
 
 // Load environment variables from .env file
 dotenv.config();
 
 export const config = {
-  google: {
-    apiKey: process.env.GOOGLE_CLOUD_API_KEY!,
-    customSearchEngineId: process.env.GOOGLE_CLOUD_API_KEY!,
-    maxResults: 10,
-    rateLimitDelay: 100
-  },
   gemini: {
     apiKey: process.env.GOOGLE_CLOUD_API_KEY || '',
     model: 'gemini-2.5-flash-lite-preview-06-17',
@@ -25,7 +19,18 @@ export const config = {
   },
   paths: {
     runsDirectory: './runs',
-    screenshotsSubdir: 'screenshots'
+    screenshotsSubdir: 'screenshots',
+    consentCacheDirectory: process.env.CONSENT_CACHE_DIR || './.cache/playwright-consent'
+  },
+  consent: {
+    locale: 'sl-SI',
+    acceptLanguage: 'sl-SI,sl;q=0.9,en-US;q=0.8,en;q=0.7,hr;q=0.6,de;q=0.5',
+    extensionPath: process.env.CONSENT_EXTENSION_PATH || '',
+    cacheDirectory: process.env.CONSENT_CACHE_DIR || './.cache/playwright-consent',
+    settleTimeoutMs: parseInt(process.env.CONSENT_SETTLE_TIMEOUT_MS || '2500', 10),
+    disableExtension: process.env.DISABLE_CONSENT_EXTENSION === 'true',
+    disableFallback: process.env.DISABLE_CONSENT_FALLBACK === 'true',
+    disablePopupCloser: process.env.DISABLE_POPUP_CLOSER === 'true'
   }
 };
 
@@ -60,7 +65,9 @@ export const viewportConfigs: ViewportConfig[] = [
 
 // Browser pool configuration
 export const browserPoolConfig: BrowserPoolConfig = {
-  maxBrowsers: 2,              // Maximum browser instances
+  maxBrowsers: 5,              // Maximum browser instances
   restartAfterPages: 50,       // Restart browser after 50 pages to prevent memory leaks
   launchTimeout: 30000         // Browser launch timeout
-}; 
+};
+
+export const consentHandlingConfig: ConsentHandlingConfig = config.consent;

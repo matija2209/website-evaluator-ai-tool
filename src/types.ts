@@ -10,6 +10,7 @@ export interface CompanyData {
   activityDescription: string;
   employeeCount: string;
   page: string;
+  [key: string]: any;
 }
 
 // Search interfaces from step-2-custom-search.md
@@ -122,6 +123,7 @@ export interface ScreenshotResult {
   errorMessage?: string;
   retryCount: number;
   timestamp: string;
+  pagePreparation?: PagePreparationResult;
   screenshotPaths: {
     desktop: string[];
     mobile: string[];
@@ -140,6 +142,48 @@ export interface BrowserPoolConfig {
   maxBrowsers: number;
   restartAfterPages: number;
   launchTimeout: number;
+}
+
+export type ConsentOutcome =
+  | 'accepted_extension_or_preexisting'
+  | 'accepted_fallback'
+  | 'skipped_unsafe'
+  | 'not_detected';
+
+export type ConsentMethod =
+  | 'extension'
+  | 'preexisting_storage_state'
+  | 'fallback'
+  | 'none';
+
+export type PopupOutcome =
+  | 'closed'
+  | 'skipped_unsafe'
+  | 'not_detected';
+
+export type PopupMethod =
+  | 'fallback'
+  | 'none';
+
+export interface PagePreparationResult {
+  consentOutcome: ConsentOutcome;
+  consentMethod: ConsentMethod;
+  popupOutcome: PopupOutcome;
+  popupMethod: PopupMethod;
+  details: string[];
+  reason?: string;
+  frameUrl?: string;
+}
+
+export interface ConsentHandlingConfig {
+  locale: string;
+  acceptLanguage: string;
+  extensionPath?: string;
+  cacheDirectory: string;
+  settleTimeoutMs: number;
+  disableExtension: boolean;
+  disableFallback: boolean;
+  disablePopupCloser: boolean;
 }
 
 // Extended CSV data structure for screenshot progress
@@ -180,4 +224,59 @@ export interface RunMetadata {
   companiesWithWebsites: number;
   companiesWithScreenshots: number;
   companiesAnalyzed: number;
-} 
+}
+
+// Wappalyzer detection interfaces
+export interface WappalyzerTechnology {
+  version: string;
+  confidence: number;
+  categories: string[];
+  groups: string[];
+}
+
+export interface WappalyzerResult {
+  [url: string]: {
+    [techName: string]: WappalyzerTechnology;
+  };
+}
+// Super Scraper interfaces
+export interface SuperScrapeConfig {
+  phases: string[]; // ['seo', 'tech', 'screenshot']
+  concurrency: number;
+  runId: string;
+  outputDir: string;
+  maxRetries: number;
+}
+
+export interface SuperScrapeResult {
+  url: string;
+  domain: string;
+  companyName: string;
+  status: 'SUCCESS' | 'FAILED' | 'SKIPPED' | 'PARTIAL';
+  pagePreparation?: PagePreparationResult;
+  seo?: {
+    title: string;
+    metaDescription: string;
+    h1: string[];
+    wordCount: number;
+    jsonLdFound: boolean;
+    fullText?: string;
+    error?: string;
+  };
+  tech?: {
+    technologies: Array<{
+      name: string;
+      version: string | null;
+      categories: string[];
+    }>;
+    error?: string;
+  };
+  screenshots?: {
+    desktopPaths: string[];
+    mobilePaths: string[];
+    error?: string;
+  };
+  error?: string;
+  loadTimeMs: number;
+  timestamp: string;
+}

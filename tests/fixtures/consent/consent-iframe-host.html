@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Consent Iframe Host</title>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        if (document.cookie.includes('iframe-consent=yes')) {
+          const frame = document.getElementById('consent-frame');
+          if (frame) frame.remove();
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <h1>Iframe host</h1>
+    <iframe
+      id="consent-frame"
+      src="/consent-iframe-banner.html"
+      title="Consent frame"
+      style="width: 100%; height: 240px; border: 0"
+    ></iframe>
+  </body>
+  </html>

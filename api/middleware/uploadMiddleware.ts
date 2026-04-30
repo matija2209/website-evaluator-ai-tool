@@ -7,7 +7,7 @@ const storage = multer.diskStorage({
       const uploadDir = await FileService.ensureUploadDirectory();
       cb(null, uploadDir);
     } catch (error) {
-      cb(error, './uploads');
+      cb(error as Error, './uploads');
     }
   },
   filename: (req, file, cb) => {

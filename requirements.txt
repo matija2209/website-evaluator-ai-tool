@@ -1,0 +1,2 @@
+wappalyzer==1.0.23
+selenium==4.43.0

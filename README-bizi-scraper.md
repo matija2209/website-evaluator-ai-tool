@@ -33,7 +33,7 @@ You can run the scraper via `npm` or `pnpm` using the `scrape:bizi-profiles` scr
 To quickly extract data from one specific Bizi profile:
 
 ```bash
-npm run scrape:bizi-profiles -- --url https://www.bizi.si/BIOTEH-D-O-O/
+npm run scrape:bizi -- --url https://www.bizi.si/BIOTEH-D-O-O/
 ```
 
 ### 2. Batch Processing from a CSV
@@ -41,7 +41,7 @@ npm run scrape:bizi-profiles -- --url https://www.bizi.si/BIOTEH-D-O-O/
 To process an entire list of profiles:
 
 ```bash
-npm run scrape:bizi-profiles -- --input path/to/input.csv
+npm run scrape:bizi -- --input path/to/input.csv
 ```
 *Note: The CLI will automatically scan the CSV for a column named `url`, `URL`, `profileUrl`, or similar to identify the source URLs.*
 
@@ -60,7 +60,7 @@ npm run scrape:bizi-profiles -- --input path/to/input.csv
 
 Run a batch scrape with 5 parallel processes and output to a specific file:
 ```bash
-npm run scrape:bizi-profiles -- --input list.csv --output results.csv --concurrency 5
+npm run scrape:bizi -- --input list.csv --output results.csv --concurrency 5
 ```
 
 Run a batch scrape while rotating multiple proxies:

@@ -3,6 +3,7 @@ import { healthRoutes } from './health';
 import { analysisRoutes } from './analysis';
 import { jobsRoutes } from './jobs';
 import { downloadRoutes } from './downloads';
+import { dashboardRoutes } from './dashboard';
 
 export const registerRoutes = (app: Express) => {
   app.use('/health', healthRoutes);
@@ -10,4 +11,5 @@ export const registerRoutes = (app: Express) => {
   app.use('/jobs', jobsRoutes);
   app.use('/status', jobsRoutes); // Alias for backwards compatibility
   app.use('/download', downloadRoutes);
+  app.use('/dashboard', dashboardRoutes);
 };

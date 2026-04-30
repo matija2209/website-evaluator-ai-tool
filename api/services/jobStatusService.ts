@@ -48,7 +48,7 @@ export class JobStatusService {
       },
       jobs: {
         waiting: waiting.map(j => ({ id: j.id!, data: j.data })),
-        active: active.map(j => ({ id: j.id!, progress: j.progress || 0, data: j.data })),
+        active: active.map(j => ({ id: j.id!, progress: typeof j.progress === 'number' ? j.progress : 0, data: j.data })),
         completed: completed.slice(0, 5).map(j => ({
           id: j.id!,
           result: j.returnvalue,

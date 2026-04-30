@@ -33,10 +33,12 @@ app.listen(PORT, () => {
   console.log(`📈 Results directory: ./runs`);
   console.log('');
   console.log('📡 Available endpoints:');
-  console.log('  GET  /health        - Health check');
-  console.log('  POST /analyze       - Start website analysis (upload CSV)');
-  console.log('  GET  /jobs          - List all jobs');
-  console.log('  GET  /jobs/:jobId   - Get job status');
-  console.log('  DEL  /jobs/:jobId   - Delete job');
-  console.log('  GET  /download/:runId - Download results CSV');
+  console.log('  GET  /health              - Health check');
+  console.log('  POST /analyze             - Start website analysis (upload CSV)');
+  console.log('  GET  /jobs                - List all jobs');
+  console.log('  GET  /jobs/:jobId         - Get job status');
+  console.log('  DEL  /jobs/:jobId         - Delete job');
+  console.log('  GET  /download/:runId     - Download results CSV');
+  console.log('  GET  /dashboard/runs      - List all dashboard runs');
+  console.log('  GET  /dashboard/runs/:id  - Get run details & tech summary');
 });

@@ -56,7 +56,7 @@ export const jobsController = {
       res.json({ 
         message: 'Job deleted successfully' 
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error.message === 'Job not found') {
         return res.status(404).json({ 
           error: 'Job not found' 

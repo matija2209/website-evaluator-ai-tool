@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://fixtures.test/sub-01.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-02.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-03.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-04.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-05.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-06.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-07.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-08.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/nested-index.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/escaped-parent.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://fixtures.test/sub-gz.xml.gz</loc>
+  </sitemap>
+</sitemapindex>

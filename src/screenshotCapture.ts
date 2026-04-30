@@ -4,7 +4,7 @@ import * as path from 'path';
 const dayjs = require('dayjs');
 const csvParser = require('csv-parser');
 import { createObjectCsvWriter } from 'csv-writer';
-import { 
+import type { 
   ScreenshotConfig, 
   ScreenshotResult, 
   ViewportConfig, 
@@ -17,6 +17,7 @@ import {
   browserPoolConfig,
   config 
 } from '../config';
+import { PlaywrightSessionManager } from './playwrightSession';
 
 // Browser Pool Management
 class BrowserPool {
@@ -110,24 +111,27 @@ class BrowserPool {
 }
 
 // Screenshot Processing
-class ScreenshotProcessor {
+export class ScreenshotProcessor {
   private config: ScreenshotConfig;
   private viewports: ViewportConfig[];
+  private sessionManager: PlaywrightSessionManager;
 
   constructor(config: ScreenshotConfig, viewports: ViewportConfig[]) {
     this.config = config;
     this.viewports = viewports;
+    this.sessionManager = new PlaywrightSessionManager();
   }
 
   async processUrl(
     url: string, 
     companyName: string, 
     runId: string, 
-    browser: Browser
+    _browser?: Browser
   ): Promise<ScreenshotResult> {
     const startTime = Date.now();
     const domain = this.extractDomain(url);
     const normalizedUrl = this.normalizeUrl(url);
+    const preparationLogPath = path.join(config.paths.runsDirectory, runId, 'page-preparation.ndjson');
     
     const result: ScreenshotResult = {
       url: normalizedUrl,
@@ -145,56 +149,63 @@ class ScreenshotProcessor {
       }
     };
 
-    let context: BrowserContext | null = null;
-    let page: Page | null = null;
+    let desktopSession: Awaited<ReturnType<PlaywrightSessionManager['openPreparedDesktopSession']>> | null = null;
+    let mobileSession: Awaited<ReturnType<PlaywrightSessionManager['openPreparedMobileSession']>> | null = null;
 
     try {
-      // Create folder structure
       const screenshotDir = await this.createFolderStructure(runId, domain);
-      
-      // Create browser context
-      context = await browser.newContext({
-        ignoreHTTPSErrors: true,
-        bypassCSP: true,
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      });
 
-      page = await context.newPage();
-
-      // Navigate to page
-      console.log(`[INFO] Loading ${domain}...`);
-      
-      await page.goto(normalizedUrl, { 
+      desktopSession = await this.sessionManager.openPreparedDesktopSession({
+        url: normalizedUrl,
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         waitUntil: 'networkidle',
-        timeout: this.config.pageTimeout 
+        timeoutMs: this.config.pageTimeout,
+        runLogPath: preparationLogPath,
+        purpose: 'screenshot-desktop'
       });
+      result.pagePreparation = desktopSession.pagePreparation;
 
-      // Wait for content if enabled
       if (this.config.enableContentWait) {
-        await this.waitForContent(page);
+        await this.waitForContent(desktopSession.page);
       }
 
-      // Capture screenshots for each viewport
-      for (const viewport of this.viewports) {
-        console.log(`[INFO] Capturing ${viewport.name} screenshots for ${domain}...`);
-        
+      const desktopViewport = this.viewports.find(viewport => viewport.name === 'desktop');
+      if (desktopViewport) {
+        console.log(`[INFO] Capturing desktop screenshots for ${domain}...`);
         const sections = await this.captureViewportSections(
-          page, 
-          viewport, 
-          path.join(screenshotDir, viewport.name)
+          desktopSession.page,
+          desktopViewport,
+          path.join(screenshotDir, 'desktop')
         );
+        result.desktopSections = sections;
+        result.screenshotPaths.desktop = this.generateSectionPaths(runId, domain, 'desktop', sections);
+      }
 
-        if (viewport.name === 'desktop') {
-          result.desktopSections = sections;
-          result.screenshotPaths.desktop = this.generateSectionPaths(
-            runId, domain, 'desktop', sections
-          );
-        } else {
-          result.mobileSections = sections;
-          result.screenshotPaths.mobile = this.generateSectionPaths(
-            runId, domain, 'mobile', sections
-          );
-        }
+      mobileSession = await this.sessionManager.openPreparedMobileSession({
+        url: normalizedUrl,
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+        waitUntil: 'networkidle',
+        timeoutMs: this.config.pageTimeout,
+        runLogPath: preparationLogPath,
+        purpose: 'screenshot-mobile',
+        viewport: { width: 375, height: 812 },
+        isMobile: true
+      });
+
+      if (this.config.enableContentWait) {
+        await this.waitForContent(mobileSession.page);
+      }
+
+      const mobileViewport = this.viewports.find(viewport => viewport.name === 'mobile');
+      if (mobileViewport) {
+        console.log(`[INFO] Capturing mobile screenshots for ${domain}...`);
+        const sections = await this.captureViewportSections(
+          mobileSession.page,
+          mobileViewport,
+          path.join(screenshotDir, 'mobile')
+        );
+        result.mobileSections = sections;
+        result.screenshotPaths.mobile = this.generateSectionPaths(runId, domain, 'mobile', sections);
       }
 
       result.status = 'SUCCESS';
@@ -207,19 +218,18 @@ class ScreenshotProcessor {
       result.loadTimeMs = Date.now() - startTime;
       console.error(`[ERROR] ${domain}: ${result.errorMessage}`);
     } finally {
-      // Cleanup
-      if (page) {
+      if (mobileSession) {
         try {
-          await page.close();
+          await mobileSession.close();
         } catch (error) {
-          console.error(`[WARN] Failed to close page for ${domain}:`, error);
+          console.error(`[WARN] Failed to close mobile session for ${domain}:`, error);
         }
       }
-      if (context) {
+      if (desktopSession) {
         try {
-          await context.close();
+          await desktopSession.close();
         } catch (error) {
-          console.error(`[WARN] Failed to close context for ${domain}:`, error);
+          console.error(`[WARN] Failed to close desktop session for ${domain}:`, error);
         }
       }
     }
@@ -240,7 +250,7 @@ class ScreenshotProcessor {
     }
   }
 
-  private async captureViewportSections(
+  public async captureViewportSections(
     page: Page, 
     viewport: ViewportConfig, 
     outputDir: string
@@ -502,8 +512,6 @@ export class ScreenshotManager {
 
       console.log(`[INFO] Processing ${urlsToProcess.length} websites...`);
 
-      await this.browserPool.initialize(this.config.concurrency);
-
       const results = await this.processUrlsConcurrently(urlsToProcess, runId);
 
       await progressTracker.updateCsvProgress(results);
@@ -514,8 +522,6 @@ export class ScreenshotManager {
     } catch (error) {
       console.error('[ERROR] Screenshot processing failed:', error);
       throw error;
-    } finally {
-      await this.browserPool.cleanup();
     }
   }
 
@@ -554,14 +560,9 @@ export class ScreenshotManager {
 
     const processUrl = async (urlData: { url: string; companyName: string }) => {
       try {
-        const browser = await this.browserPool.getBrowser();
-        
         console.log(`[INFO] Progress: ${completed + 1}/${urlsToProcess.length} (${((completed + 1) / urlsToProcess.length * 100).toFixed(1)}%) - Processing: ${urlData.url}`);
         
-        let result = await this.processWithRetries(urlData, runId, browser);
-        
-        this.browserPool.releaseBrowser(browser);
-        results.push(result);
+        const result = await this.processWithRetries(urlData, runId);
         completed++;
         
         return result;
@@ -600,8 +601,7 @@ export class ScreenshotManager {
 
   private async processWithRetries(
     urlData: { url: string; companyName: string },
-    runId: string,
-    browser: Browser
+    runId: string
   ): Promise<ScreenshotResult> {
     let lastError: string = '';
     
@@ -610,8 +610,7 @@ export class ScreenshotManager {
         const result = await this.processor.processUrl(
           urlData.url, 
           urlData.companyName, 
-          runId, 
-          browser
+          runId
         );
         
         result.retryCount = attempt;
@@ -670,4 +669,4 @@ export async function runScreenshotCapture(
 }
 
 // Export for testing
-export { BrowserPool, ScreenshotProcessor, ProgressTracker }; 
+export { BrowserPool, ProgressTracker };

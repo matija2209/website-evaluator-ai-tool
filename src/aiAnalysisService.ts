@@ -310,7 +310,7 @@ function cleanGeminiResponse(text: string): string {
 }
 
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(config.google.apiKey);
+const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
 
 // Gemini Analysis Functions
 export async function analyzeMobileScreenshot(

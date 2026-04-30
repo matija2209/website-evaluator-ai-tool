@@ -18,6 +18,13 @@ This project transforms directory listings (from sources like bizi.si, zlatestra
 - **🎨 Design Age Estimation**: Determines website design era from Early 2000s to Modern 2020s
 - **Progress Tracking**: Resume-capable processing with CSV-based progress tracking
 - **Batch Processing**: Handles large datasets with rate limiting and error handling
+- **🔍 Technology Detection**: Detects 1000+ technologies using Node.js/Playwright (No Python needed).
+- **🗺️ Sitemap Scraping**: Recursively extracts all URLs from XML sitemaps.
+- **🛡️ Bot Resilience**: Mimics Googlebot and uses robust regex-based XML parsing.
+- **📧 Email Inference**: Automatically recovers missing websites from company email domains.
+- **🚀 Super Scraper**: Unified engine that combines SEO, Tech, and Screenshots into a single optimized browser visit.
+- **🍪 Consent & Popup Handling**: Uses Slovenian-first Playwright sessions, optional Consent-O-Matic, safe cookie acceptance fallback, iframe scanning, and conservative marketing-popup closing.
+- **🛑 Domain Filtering**: Multi-layer filtering to strictly exclude directory portals like bizi.si.
 
 ## Project Structure
 
@@ -33,6 +40,7 @@ This project transforms directory listings (from sources like bizi.si, zlatestra
           /mobile
             section-1.jpeg
             section-2.jpeg
+      page-preparation.ndjson
       input.csv
       website-discovery-progress.csv
       screenshot-progress.csv
@@ -48,6 +56,10 @@ This project transforms directory listings (from sources like bizi.si, zlatestra
     types.ts
     websiteAnalysisRunner.ts
     websiteDiscovery.ts
+    wappalyzerWrapper.ts      # 🔍 Wappalyzer Next integration
+    sitemapScraper.ts         # 🗺️ Recursive sitemap crawler with Googlebot emulation
+  /python-env/                # 🐍 Python virtual environment for Wappalyzer
+  requirements.txt            # 🐍 Python dependencies
   /api                        # 🆕 Professional API layer (added 2025-01-09)
     server.ts                 # Express API server
     worker.ts                 # BullMQ background worker
@@ -71,6 +83,8 @@ This project transforms directory listings (from sources like bizi.si, zlatestra
   config.ts
   compose.yml                 # 🆕 Docker Compose for production API
   Dockerfile                  # 🆕 Containerized API deployment
+  /dashboard                  # 📊 React + Vite Results Dashboard
+  /.cache/playwright-consent  # 🍪 Global per-domain consent + storageState cache
 ```
 
 ## Installation
@@ -78,6 +92,8 @@ This project transforms directory listings (from sources like bizi.si, zlatestra
 ```bash
 pnpm install
 ```
+
+The technology detection feature is now fully integrated into the Node.js/Playwright pipeline. No separate Python environment or Firefox installation is required for core analysis.
 
 ### Dependencies
 
@@ -92,6 +108,10 @@ pnpm install
 - `fs-extra` - File system utilities
 - `dayjs` - Date handling
 
+**🔍 Technology Detection Dependencies:**
+- `wappalyzer` (Node.js) - Native pattern matching engine
+- `playwright` - Shared browser infrastructure (No Firefox/Python needed)
+
 **🆕 API Dependencies (added 2025-01-09):**
 - `express` - Web framework for REST API
 - `bullmq` - Redis-based job queue for background processing
@@ -105,7 +125,30 @@ Create a `.env` file with your API keys:
 
 ```env
 GOOGLE_CLOUD_API_KEY=your_GOOGLE_CLOUD_API_KEY_here
+
+# Optional: load Consent-O-Matic as an unpacked Chromium extension
+CONSENT_EXTENSION_PATH=/absolute/path/to/consent-o-matic-extension
+
+# Optional: override default global consent/storageState cache
+CONSENT_CACHE_DIR=./.cache/playwright-consent
+
+# Optional: tune or disable the fallback layers
+CONSENT_SETTLE_TIMEOUT_MS=2500
+DISABLE_CONSENT_EXTENSION=false
+DISABLE_CONSENT_FALLBACK=false
+DISABLE_POPUP_CLOSER=false
 ```
+
+### Consent-Aware Browsing
+
+The Playwright-based scrapers now use a shared page-preparation layer designed for unknown EU websites, especially Slovenian sites:
+
+- Chromium sessions run with `locale: 'sl-SI'` and Slovenian-first `Accept-Language`.
+- If `CONSENT_EXTENSION_PATH` is set, the tool tries to load Consent-O-Matic as an unpacked Chromium extension.
+- If no known CMP handles the banner, a conservative fallback scans the main page and all iframes for cookie/privacy/GDPR signals before clicking only safe accept actions inside consent-looking containers.
+- A separate conservative popup closer targets newsletter/discount/notification/adblock overlays, but skips login, payment, checkout, age-gate, and other risky dialogs.
+- Successful browser state is cached per domain and reused across runs to reduce repeated consent banners.
+- Every prepared visit writes structured telemetry to `page-preparation.ndjson` inside the run or output directory.
 
 ## Usage
 
@@ -139,6 +182,11 @@ curl http://localhost:3000/download/[RUN_ID] -o results.csv
 - `GET /jobs/:jobId` - Get specific job status and progress
 - `DELETE /jobs/:jobId` - Delete/cancel job
 - `GET /download/:runId` - Download results CSV
+- `GET /dashboard/runs` - List all historical analysis runs
+- `GET /dashboard/runs/:runId` - Detailed run metadata and stats
+- `GET /dashboard/runs/:runId/results` - Paginated run results (with tech enrichment)
+- `GET /dashboard/runs/:runId/tech-summary` - Aggregated technology & category distribution
+- `GET /dashboard/runs/:runId/files` - List available CSV sources (Failures, SEO, Discovery)
 
 **Development API Mode:**
 ```bash
@@ -146,26 +194,159 @@ pnpm run dev:api      # API server with hot reload
 pnpm run dev:worker   # Background worker with hot reload
 ```
 
+### 📊 **Pipeline Dashboard (Visual Results Explorer)**
+
+A modern, premium web interface to browse, filter, and visualize all analysis results. Built with **React**, **Vite**, **Tailwind CSS v4**, and **Shadcn UI**.
+
+#### Features:
+- **Run Browser**: View all historical analysis sessions in a clean, interactive grid.
+- **📁 Multi-Source Explorer**: Switch between `output.csv`, `scraping-failures.csv`, and `seo-results.csv` within a single run.
+- **🛠️ Stack Insights**: 
+  - **Top Technologies**: Visual distribution bars showing market share of 1,000+ tools.
+  - **Category Analysis**: Broad grouping by **CMS**, **Ecommerce**, **Analytics**, **PaaS**, etc.
+  - **Click-to-Filter**: Instantly isolate sites using specific technologies or categories.
+- **Real-time Stats**: Live summary of total companies, successful discoveries, and weighted performance scores.
+- **Interactive Data Table**: Dynamic columns that adapt to the selected data source (Failures vs Results).
+- **Technology Badges**: Clickable badges in the results table for quick stack exploration.
+
+#### How to Start:
+
+1. **Start the Backend API** (provides the data):
+   ```bash
+   pnpm run api
+   ```
+
+2. **Launch the Dashboard**:
+   ```bash
+   cd dashboard
+   pnpm install    # First time only
+   pnpm run dev
+   ```
+   Access the dashboard at **http://localhost:5173/**.
+
+---
+
 ### **CLI Mode (Direct Processing)**
 
+The tool provides a suite of CLI commands for both the end-to-end evaluation pipeline and specialized scraping/analysis tasks.
+
+#### **1. Core Evaluation Pipeline**
+Run the full evaluation or selected phases with controlled parallelism. This replaces the manual step-by-step process.
+
 ```bash
-# Phase 1 & 2: Website Discovery
-pnpm run start /path/to/companies.csv
+# Full Pipeline (Discovery -> Unified Scraping -> AI Analysis)
+npm run pipeline -- --input input/my_file.csv --concurrency 20
 
-# Phase 3: Screenshot Capture
-pnpm run screenshot [RUN_ID] [concurrency]
-pnpm run screenshot 20250629_110643 1
+# Selected Phases (e.g., only SEO and Tech Analysis)
+# This will use the "Super Scraper" to perform both in ONE visit per site.
+npm run pipeline -- --input input/my_file.csv --phases seo,tech --concurrency 20
 
-# Phase 4: AI Analysis
-pnpm run analyze [RUN_ID] [force]
-pnpm run analyze 20250629_110643
-pnpm run analyze 20250629_110643 force  # Force reanalysis
-
-# Bizi.si Profile Scraper
-# For extracting company profiles directly from Bizi.si pages
-npm run scrape:bizi-profiles -- --help
-# See README-bizi-scraper.md for full details
+# Resume an existing run
+npm run pipeline -- --runId 20260429_1000 --phases seo,tech,screenshot
 ```
+
+**Phases:** `discovery`, `screenshot`, `seo`, `tech`, `analysis`.
+
+> [!TIP]
+> **Performance Optimization**: On high-end hardware (64GB RAM / Ryzen 3600), use `--concurrency 20-30`. The **Fluid Worker Pool** ensures 100% browser utilization by immediately assigning new URLs to idle browsers.
+
+---
+
+#### **2. Specialized Scrapers & Manual Controls**
+You can still run individual phases or specialized tools if needed:
+
+```bash
+# Screenshot Capture (Phase 3)
+pnpm run screenshot [RUN_ID] [concurrency]
+
+# AI Analysis (Phase 4)
+pnpm run analyze [RUN_ID] [force]
+
+# Consent / popup handling fixture tests
+pnpm run test:consent
+```
+
+#### **2. Specialized Scrapers**
+Extract rich data from specific sources or site structures.
+
+```bash
+# Bizi.si Profile Scraper
+# Extract full company profiles (address, tax info, TRR) from Bizi.si
+npm run scrape:bizi -- --input input.csv --output output.csv
+
+# SEO Metadata Scraper
+# Capture <title>, meta descriptions, JSON-LD, and body text
+npm run scrape:seo -- --input output.csv --urlColumn website
+
+# Sitemap Scraper
+# Recursively crawl XML sitemaps using Googlebot emulation
+npm run scrape:sitemaps -- --input output.csv --column website
+
+# Full Sitemap-Only Scraper
+# Traverse direct sitemap or sitemap-index URLs, including nested .xml.gz files
+npm run scrape:sitemaps:full -- --sitemap https://firmen.wko.at/sitemap/sitemap_index.xml --sitemap https://www.firmenabc.at/sitemap.xml --output-dir output/sitemap-links
+```
+
+#### **WKO Proxy Quickstart**
+For `firmen.wko.at` scraping with authenticated proxies:
+
+```bash
+# 1) Define authenticated proxies in .env (preferred safe format)
+# SCRAPER_PROXIES_AUTH="http://host:port|user|pass,http://host2:port|user2|pass2"
+
+# 2) Verify proxy connectivity first
+pnpm run test-proxies
+
+# 3) Run WKO profile scraper
+pnpm run scrape:wko -- --input input/wko.csv --concurrency 4
+```
+
+`scrape:wko` now preflight-tests configured proxies and retries denied pages using only healthy proxies.
+See `README-wko-scraper.md` for full options and output details.
+
+#### **3. Technology & Analysis**
+Deep dive into the technical stack of discovered websites.
+
+```bash
+# Technology Detection (Wappalyzer)
+# Detect 1,000+ technologies using headless Chrome via Playwright
+# No system dependencies (Firefox/Geckodriver) required.
+npm run analyze:tech -- --path output.csv --column website --limit 10
+```
+
+#### **4. Maintenance & Utility Tools**
+Tools for quality control, debugging, and data management.
+
+```bash
+# Sitemap Quality Audit
+# Report on healthy vs empty sitemaps, missing robots.txt, etc.
+npm run audit:sitemaps output.csv website
+
+# Full Sitemap Fixture Test
+# Offline coverage for nested indexes, gzip, escaped child URLs, and dedupe behavior
+npm run test:sitemaps:full
+
+# Site Debugger
+# Isolation tool for troubleshooting individual domain sitemap failures
+npm run debug:site <domain_or_url>
+
+# Proxy Tester
+# Verify connectivity and public IPs for proxies from SCRAPER_PROXIES_AUTH or SCRAPER_PROXIES
+npm run test-proxies
+
+# Results Merger
+# Consolidate batch results and deduplicate entries
+npm run merge:results
+
+# URL Recoverer
+# Recover websites from email domains and fix common URL issues
+# Use this on Bizi.si results to prepare for the evaluation pipeline
+npx ts-node src/urlRecoverer.ts [input_csv] [output_csv]
+# Example: npx ts-node src/urlRecoverer.ts output/bizi-results.csv input/final_list.csv
+```
+
+---
+
 
 ### Individual Phase Commands
 
@@ -174,6 +355,7 @@ npm run scrape:bizi-profiles -- --help
 pnpm run test                    # Infrastructure tests
 pnpm run test:phase2            # Website discovery tests  
 pnpm run test:ai-analysis       # AI analysis tests
+pnpm run test:consent           # Consent, iframe, popup, and cache reuse tests
 
 # Development
 pnpm run dev                    # Watch mode for development
@@ -204,18 +386,20 @@ The tool follows a sequential 4-phase approach:
 ### Phase 1: Foundation
 - Environment setup and data preparation
 - Creates run-specific directories with timestamp-based RUN_ID
+- Automatically filters out `bizi.si` and other directory URLs from the input stream.
 
-### Phase 2: Website Discovery 🔥 **CRITICAL PHASE**
-- Uses Google Custom Search API to find actual company websites
-- AI-enhanced intelligent website selection (vs simple "first result")
-- Applies domain exclusion filters (directories, social media)
-- Companies without discovered websites are excluded from further processing
+### Phase 2: Website Discovery 🔥 **RETIRED**
+- **Automated discovery via Google Search has been retired.**
+- The tool now expects actual company websites to be provided in the input CSV (e.g., in a `website` column).
+- You can obtain these URLs by running the **Bizi.si Profile Scraper** first.
+- Companies without valid websites in the input are excluded from further processing.
 
-### Phase 3: Screenshot Capture
-- Captures sectioned screenshots for both desktop and mobile views
-- Uses Playwright for reliable browser automation
-- Organizes screenshots by domain in structured folders
-- Only processes companies with successfully discovered websites
+### Phase 3: Unified Scraping (Super Scraper) 🚀
+- **One Visit, All Data**: Combines SEO, Tech, and Screenshotting into a single browser visit per URL.
+- **Desktop/Mobile Parity**: Performs one Desktop visit (SEO + Tech + SS) and one Mobile visit (SS).
+- **Technology Detection**: Built-in Wappalyzer logic (no Python dependency).
+- **Sectioned Screenshots**: Captures full-page context via intelligent scrolling.
+- **Consent-Aware Sessions**: Desktop runs use persistent Chromium contexts with optional Consent-O-Matic, custom iframe-aware consent fallback, safe popup closing, and per-domain `storageState` reuse for the mobile pass.
 
 ### Phase 4: AI Analysis ✨ **ENHANCED WITH DESIGN AGE ESTIMATION**
 - Uses Gemini 2.0 Flash for sophisticated website evaluation
@@ -247,10 +431,12 @@ Company_Name, Cleaned_Name, City, Original_URL, Discovered_Website
 Search_Status, SERP_Position, AI_Confidence, AI_Reasoning, Tokens_Used
 ```
 
-**Phase 3 - Screenshot Capture:**
-```
-Screenshot_Status, Desktop_Sections, Mobile_Sections, Load_Time_MS, Screenshot_Timestamp
-```
+**Phase 3 - Unified Scraping (Super Scraper) 🚀:**
+- `status`: SUCCESS | PARTIAL | FAILED
+- `seo-results.csv`: Master file for all SEO metadata and text content.
+- `tech_analysis/*.json`: Individual technology fingerprints for every domain.
+- `scraping-failures.csv`: **New!** Dedicated log of every site failure with specific error reasons (Timeout, 403, SSL, etc.).
+- `page-preparation.ndjson`: Structured per-URL logs for consent detection, popup handling, chosen method, and safe-skip reasons.
 
 **Phase 4 - AI Analysis (ENHANCED):**
 ```
@@ -269,6 +455,7 @@ Key settings in `config.ts`:
 - **Retry Logic**: Up to 3 attempts per phase
 - **Google Custom Search**: 10 results per query with 100ms delays
 - **🎨 AI Analysis**: Enhanced prompts with design era indicators, 1500 token limit
+- **Consent Handling**: `sl-SI` locale, Slovenian-first `Accept-Language`, optional extension loading, per-domain state cache, settle timeout, and feature flags for extension/fallback/popup closer
 
 ## Error Handling
 
@@ -276,23 +463,22 @@ Key settings in `config.ts`:
 - **Screenshot failed**: Marked as `SCREENSHOT_FAILED`, excluded from AI analysis
 - **Analysis failed**: Marked as `ANALYSIS_FAILED`, included in output with error status
 
-## Resume Capability
+## Resume & Auto-Init Capability
 
-Each phase tracks progress in CSV files, allowing the tool to resume from the last successful point if interrupted.
+- **Auto-Initialization**: If you provide an `--input` file but skip discovery, the pipeline automatically creates a new Run ID and normalizes your CSV columns (`website`, `URL`, etc.).
+- **Resume**: Each phase tracks progress in CSV files, allowing the tool to resume from the last successful point if interrupted.
 
 ## Development Approach
 
 **Sequential Development**: Each phase must be perfected individually before moving to the next:
 
-1. **Phase 1**: Foundation (Days 1-2)
-2. **Phase 2**: Website Discovery (Days 3-5) ← **CORE PHASE**
-3. **Phase 3**: Screenshot Capture (Days 6-8)
-4. **Phase 4**: AI Analysis (Days 9-11)
-5. **Phase 5**: Integration & Testing (Days 12-15)
+1. **Phase 1**: Foundation
+2. **Phase 2**: URL Preparation (Manual/Scraped)
+3. **Phase 3**: Screenshot Capture
+4. **Phase 4**: AI Analysis
 
 ## Success Criteria
 
-- **Phase 2**: 60-80% website discovery success rate
 - **Phase 3**: 90%+ screenshot success rate for reachable websites
 - **Phase 4**: Consistent scoring and token usage within budget
 - **Full Pipeline**: Process complete dataset without crashes
@@ -338,6 +524,62 @@ Detailed implementation guides are available in the `/docs` folder:
 - Design age estimation working correctly (EARLY_2020S era detected)
 - Complete pipeline ready for production deployment
 - **🆕 Professional REST API with Docker deployment ready**
+- **🗺️ Sitemap Scraper optimized for Slovenian ecosystem (Googlebot + Regex fix)**
+- **📧 Website Recovery rate increased by 25% via email domain inference**
+
+---
+
+### **Sitemap & Resilience Update (2026-04-28)**
+
+**Advanced Sitemap Scraper:**
+- **Recursive Traversal**: Automatically follows sitemap indexes and nested `.xml`/`.xml.gz` files.
+- **Googlebot Emulation**: Uses `Googlebot` User-Agent via Playwright BrowserContext to bypass XSLT-based "human-readable" HTML rendering (common in WordPress/Yoast SEO).
+- **Resilient XML Parsing**: Implemented a newline-aware regex (`[\s\S]*?`) to extract `<loc>` tags even when formatted across multiple lines or within complex namespaces.
+- **Massive Site Management**: Automatically flags and limits recursion for "Massive" sites (>10 child sitemaps) to prevent resource exhaustion.
+- **Direct Sitemap CLI**: Added `scrape:sitemaps:full` for direct sitemap/index URLs with breadth-first traversal, XML-aware parsing, `&amp;` child URL decoding, and disk-backed dedupe for massive sitemap trees.
+- **Manual Verification Targets (2026-04-29)**: `https://firmen.wko.at/sitemap/sitemap_index.xml` and `https://www.firmenabc.at/sitemap.xml`
+
+**Smart Website Recovery:**
+- **Email Domain Inference**: If a website is missing or hidden (e.g., "Več kontaktov v TIS-u"), the tool now extracts the domain from the company's email address (e.g., `info@osterrob.si` → `https://www.osterrob.si`).
+- **Domain Exclusion**: Intelligently skips common free email providers (Gmail, Outlook, Siol, etc.) during inference to avoid false positives.
+
+**Data Quality Tools:**
+- **`check-quality.ts`**: Comprehensive audit tool that reports on healthy vs empty sitemaps, missing robots.txt, and massive sites.
+- **`debug-site.ts`**: Isolation tool for troubleshooting individual domain failures with verbose logging.
+- **`merge-results.ts`**: Utility to merge batch results and deduplicate entries while preserving the latest data.
+
+---
+
+---
+
+### **SEO Batch Scraper Update (2026-04-28)**
+
+**High-Scale SEO Scraper CLI:**
+- **Playwright-Powered**: Uses browser automation to visit websites, ensuring JS-rendered content (like titles and JSON-LD) is fully captured.
+- **Metadata Extraction**: Captures `<title>`, meta descriptions, and Open Graph tags.
+- **Deep JSON-LD Extraction**: Automatically finds and parses all `application/ld+json` scripts on the page.
+- **Text content extraction**: Captures all visible body text (truncated to 30,000 chars for CSV safety) for downstream AI processing.
+- **Optimized Output**: Produces a clean, filtered CSV containing only `website`, `biziUrl`, and the scraped SEO data to minimize redundant columns.
+
+**Resilience & Performance:**
+- **Concurrency Control**: Defaults to 3 parallel browser contexts for speed without overloading target servers.
+- **Batch Saving**: Progress is saved to CSV every 50 URLs, preventing data loss during long runs.
+- **URL Normalization**: Automatically handles missing protocols and validates URL formats.
+
+---
+
+### **Wappalyzer Integration Update (2026-04-28)**
+
+**Tech Stack Analyzer CLI:**
+- **Flexible Processing**: New script `techStackAnalyzer.ts` that accepts any CSV `--path` and any `--column` name.
+- **Deep Technology Detection**: Integrated **Wappalyzer Next** to detect 1,000+ technologies with high confidence.
+- **Headless Firefox Support**: Uses "full" scan mode to execute JavaScript and identify dynamic technologies (e.g., React, Vue, Shopamine).
+- **Per-Domain JSON Storage**: Each analyzed domain gets its own JSON file in `output/tech_analysis/` (e.g., `kristaldoo.si.json`).
+- **Batch Summarization**: Automatically produces a consolidated batch report for easy AI ingestion.
+
+**Infrastructure:**
+- **Subprocess Bridge**: Robust Node.js wrapper for the Python-based Wappalyzer CLI.
+- **Virtual Env Isolation**: Integrated with `python-env/` to manage specialized dependencies like `geckodriver`.
 
 ---
 

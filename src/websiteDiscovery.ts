@@ -83,7 +83,7 @@ export class WebsiteDiscoveryService {
   }
 
   /**
-   * Process multiple companies in batches with rate limiting
+   * Process multiple companies (Automated Search RETIRED)
    */
   async discoverWebsitesForCompanies(
     companies: CompanyProcessingState[],
@@ -91,53 +91,25 @@ export class WebsiteDiscoveryService {
     onProgress?: (processed: number, total: number, company: CompanyProcessingState) => void
   ): Promise<CompanyProcessingState[]> {
     
-    console.log(`\n🚀 Starting website discovery for ${companies.length} companies`);
-    console.log(`📊 Processing with ${config.google.rateLimitDelay}ms delay between requests`);
-    console.log(`🔄 Max ${config.processing.maxRetries} retries per company\n`);
+    console.log(`\n🛑 Phase 2 (Automated Discovery) is RETIRED.`);
+    console.log(`💡 Please ensure your input CSV has a 'website' column.`);
+    console.log(`💡 You can use 'npm run scrape:bizi' first to collect websites.\n`);
 
-    const processedCompanies: CompanyProcessingState[] = [];
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (let i = 0; i < companies.length; i++) {
-      const company = companies[i];
-      
-      console.log(`\n📈 Progress: ${i + 1}/${companies.length} (${Math.round((i + 1) / companies.length * 100)}%)`);
-      
-      const processed = await this.processCompany(company);
-      processedCompanies.push(processed);
-
-      if (processed.searchStatus === 'WEBSITE_DISCOVERED') {
-        successCount++;
-        console.log(`✅ Success! Found: ${processed.discoveredWebsite}`);
-      } else {
-        failureCount++;
-        console.log(`❌ Failed: ${processed.searchError || 'No website found'}`);
+    const processedCompanies: CompanyProcessingState[] = companies.map(company => {
+      if (company.searchStatus === 'WEBSITE_DISCOVERED') {
+        return company;
       }
+      return {
+        ...company,
+        searchStatus: 'NO_WEBSITE_FOUND',
+        searchError: 'Automated Google Search discovery is RETIRED. Provide website URLs directly.',
+        processingDate: new Date().toISOString()
+      };
+    });
 
-      // Call progress callback if provided
-      if (onProgress) {
-        onProgress(i + 1, companies.length, processed);
-      }
-
-      // Save progress periodically (every 10 companies)
-      if ((i + 1) % 10 === 0 || i === companies.length - 1) {
-        await CsvProcessor.writeWebsiteDiscoveryProgress(runDir, processedCompanies);
-        console.log(`💾 Progress saved (${i + 1}/${companies.length} processed)`);
-      }
-
-      // Rate limiting delay (except for last item)
-      if (i < companies.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, config.google.rateLimitDelay));
-      }
-    }
-
-    // Final statistics
-    const successRate = Math.round((successCount / companies.length) * 100);
-    console.log(`\n📊 Website Discovery Complete!`);
-    console.log(`✅ Success: ${successCount}/${companies.length} (${successRate}%)`);
-    console.log(`❌ Failed: ${failureCount}/${companies.length} (${Math.round((failureCount / companies.length) * 100)}%)`);
-
+    // Save initial progress to satisfy downstream steps
+    await CsvProcessor.writeWebsiteDiscoveryProgress(runDir, processedCompanies);
+    
     return processedCompanies;
   }
 
@@ -273,9 +245,22 @@ export class WebsiteDiscoveryService {
 
     // Read and prepare companies
     const rawCompanies = await CsvProcessor.readCompaniesFromCsv(inputCsvPath);
-    const companies = rawCompanies.map(company => 
-      CsvProcessor.prepareCompanyForProcessing(company)
-    );
+    const companies = rawCompanies.map(company => {
+      const prepared = CsvProcessor.prepareCompanyForProcessing(company);
+      
+      // If the input already has a 'website' or 'discoveredWebsite', use it (exclude bizi.si)
+      const existingWebsite = company.website || company.discoveredWebsite;
+      if (existingWebsite && existingWebsite.length > 5 && !existingWebsite.includes('bizi.si')) {
+        return {
+          ...prepared,
+          discoveredWebsite: existingWebsite.startsWith('http') ? existingWebsite : `https://${existingWebsite}`,
+          searchStatus: 'WEBSITE_DISCOVERED' as const,
+          searchQuery: 'PRE-FILLED',
+          processingDate: new Date().toISOString()
+        };
+      }
+      return prepared;
+    });
 
     // Create and save run metadata
     const metadata: RunMetadata = {

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Iframe Banner</title>
+    <style>
+      body { margin: 0; font-family: sans-serif; }
+      #iframe-banner { background: #153243; color: white; padding: 20px; }
+    </style>
+    <script>
+      function acceptIframeConsent() {
+        document.cookie = 'iframe-consent=yes; path=/';
+        if (window.parent && window.parent.document) {
+          const frame = window.parent.document.getElementById('consent-frame');
+          if (frame) frame.remove();
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="iframe-banner" role="dialog" aria-label="Datenschutz und Cookies">
+      <p>Wir verwenden Cookies und Datenschutz-Einstellungen für diese Website.</p>
+      <button onclick="acceptIframeConsent()">Alles akzeptieren</button>
+    </div>
+  </body>
+  </html>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Newsletter Popup</title>
+    <style>
+      #newsletter-popup {
+        position: fixed;
+        inset: 20% 20%;
+        background: white;
+        border: 2px solid #111;
+        padding: 24px;
+      }
+    </style>
+    <script>
+      function closePopup() {
+        const popup = document.getElementById('newsletter-popup');
+        if (popup) popup.remove();
+      }
+    </script>
+  </head>
+  <body>
+    <div id="newsletter-popup" role="dialog" aria-modal="true">
+      <p>Subscribe to our newsletter for a discount coupon.</p>
+      <button onclick="closePopup()">No thanks</button>
+    </div>
+  </body>
+  </html>

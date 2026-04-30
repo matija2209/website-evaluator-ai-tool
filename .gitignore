@@ -10,12 +10,15 @@ pids
 *.pid
 *.seed
 *.pid.lock
-
+runs/*
+python-env/*
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
 output/*
 input/*
+/output/
+/input/
 # nyc test coverage
 .nyc_output
 

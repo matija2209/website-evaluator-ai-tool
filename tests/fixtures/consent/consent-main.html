@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="sl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Consent Main</title>
+    <style>
+      body { font-family: sans-serif; margin: 0; padding: 32px; }
+      #cookie-banner {
+        position: fixed;
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        background: #202124;
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+      }
+      button { margin-right: 12px; }
+    </style>
+    <script>
+      window.unrelatedAcceptClicked = false;
+      window.addEventListener('DOMContentLoaded', () => {
+        if (document.cookie.includes('consent=yes')) {
+          const banner = document.getElementById('cookie-banner');
+          if (banner) banner.remove();
+        }
+      });
+
+      function acceptConsent() {
+        document.cookie = 'consent=yes; path=/';
+        const banner = document.getElementById('cookie-banner');
+        if (banner) banner.remove();
+      }
+
+      function unrelatedAccept() {
+        window.unrelatedAcceptClicked = true;
+      }
+    </script>
+  </head>
+  <body>
+    <h1>Test page</h1>
+    <button id="unrelated-accept" onclick="unrelatedAccept()">Accept</button>
+    <div
+      id="cookie-banner"
+      role="dialog"
+      aria-label="Piškotki in zasebnost"
+    >
+      <p>Ta stran uporablja piškotke za izboljšanje zasebnosti in uporabniške izkušnje.</p>
+      <button id="accept-all" onclick="acceptConsent()">Sprejmi vse</button>
+      <button>Nastavitve</button>
+    </div>
+  </body>
+  </html>

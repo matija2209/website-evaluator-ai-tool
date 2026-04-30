@@ -353,6 +353,23 @@ async function scrapeProfile(browser: Browser, record: InputRecord, proxyUrl?: s
     result.phone = await extractContactField(page, '.b-box-company-info a[href^="tel:"]');
     result.website = await extractWebsite(page);
     result.email = await extractContactField(page, '.b-box-company-info a[href^="mailto:"]');
+
+    // Fallback: If website is missing or generic, infer from email domain
+    if ((!result.website || result.website === 'Več kontaktov v TIS-u') && result.email) {
+      const emailMatch = result.email.match(/@([^@\s]+\.[^@\s]+)$/);
+      if (emailMatch) {
+        const domain = emailMatch[1].toLowerCase();
+        const skipDomains = [
+          'gmail.com', 'outlook.com', 'yahoo.com', 'hotmail.com', 'icloud.com',
+          'me.com', 't-2.net', 'telemach.net', 'siol.net', 'amis.net', 'volja.net',
+          'email.si', 'siol.com', 'triera.net', 'arnes.si'
+        ];
+        if (!skipDomains.includes(domain)) {
+          result.website = `https://www.${domain}`;
+          console.log(`[INFO] [${result.companyName}] Inferred website from email: ${result.website}`);
+        }
+      }
+    }
     result.taxNumber = companyInfo['Davčna številka SI'] || '';
     result.registrationNumber = companyInfo['Matična'] || '';
     result.vatLiable = companyInfo['Zavezanec za DDV'] || '';
@@ -384,7 +401,8 @@ async function getAlreadyScrapedUrls(outputPath: string): Promise<Set<string>> {
       fs.createReadStream(outputPath)
         .pipe(csv())
         .on('data', (row: any) => {
-          if (row.status === 'SUCCESS' && row.sourceUrl) {
+          const hasValidWebsite = row.website && row.website.trim() !== '' && row.website !== 'Več kontaktov v TIS-u';
+          if (row.status === 'SUCCESS' && row.sourceUrl && hasValidWebsite) {
             scrapedUrls.add(row.sourceUrl);
           }
         })

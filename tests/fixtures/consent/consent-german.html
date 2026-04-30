@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Consent German</title>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        if (document.cookie.includes('german-consent=yes')) {
+          const banner = document.getElementById('german-banner');
+          if (banner) banner.remove();
+        }
+      });
+
+      function acceptGermanConsent() {
+        document.cookie = 'german-consent=yes; path=/';
+        const banner = document.getElementById('german-banner');
+        if (banner) banner.remove();
+      }
+    </script>
+  </head>
+  <body>
+    <div id="german-banner" role="dialog">
+      <p>Diese Website verwendet Cookies und Datenschutz-Hinweise.</p>
+      <button onclick="acceptGermanConsent()">Alles akzeptieren</button>
+      <button>Ablehnen</button>
+    </div>
+  </body>
+  </html>

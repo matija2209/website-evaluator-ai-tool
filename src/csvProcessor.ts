@@ -14,35 +14,21 @@ export class CsvProcessor {
       const companies: CompanyData[] = [];
       
       fs.createReadStream(filePath)
-        .pipe(csv({
-          headers: [
-            'filterGroup',
-            'title', 
-            'url',
-            'streetAddress',
-            'city',
-            'businessId',
-            'taxNumber',
-            'activityDescription',
-            'employeeCount',
-            'page'
-          ]
-        }))
+        .pipe(csv())
         .on('data', (row) => {
-          // Skip header row
-          if (row.filterGroup === 'Filter Group') return;
-          
+          // Normalize common keys but keep everything
           companies.push({
-            filterGroup: row.filterGroup,
-            title: row.title,
-            url: row.url,
-            streetAddress: row.streetAddress,
-            city: row.city,
-            businessId: row.businessId,
-            taxNumber: row.taxNumber,
-            activityDescription: row.activityDescription,
-            employeeCount: row.employeeCount,
-            page: row.page
+            ...row,
+            filterGroup: row['Filter Group'] || row.filterGroup || '',
+            title: row.Title || row.title || '',
+            url: row.URL || row.url || '',
+            streetAddress: row['Street Address'] || row.streetAddress || '',
+            city: row.City || row.city || '',
+            businessId: row['Business ID'] || row.businessId || '',
+            taxNumber: row['Tax Number'] || row.taxNumber || '',
+            activityDescription: row['Activity Description'] || row.activityDescription || '',
+            employeeCount: row['Employee Count'] || row.employeeCount || '',
+            page: row.Page || row.page || ''
           });
         })
         .on('end', () => {
